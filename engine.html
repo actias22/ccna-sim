@@ -83,8 +83,8 @@
             const defaultSwitchInterfaces = { "Ethernet0/0": {}, "Ethernet0/1": {}, "Ethernet0/2": {}, "Ethernet0/3": {}, "GigabitEthernet0/1": {} };
             const defaultRouterInterfaces = { "GigabitEthernet0/0": {}, "GigabitEthernet0/1": {} };
 
-            // ★改良: 画面履歴(screenLog)と入力履歴(commandHistory)を状態として追加
-            const switchState = {
+            // ★改良: テンプレートとして定数を定義（直接書き換えないためのマスターデータ）
+            const initialSwitchState = {
                 mode: 'user', hostname: initialHostname, 
                 screenLog: [], commandHistory: [],
                 interfaces: JSON.parse(JSON.stringify(defaultSwitchInterfaces)), 
@@ -102,7 +102,7 @@
                 }
             };
 
-            const routerState = {
+            const initialRouterState = {
                 mode: 'user', hostname: initialHostname, 
                 screenLog: [], commandHistory: [],
                 interfaces: JSON.parse(JSON.stringify(defaultRouterInterfaces)), 
@@ -119,9 +119,9 @@
                 }
             };
 
-            let deviceState = deviceType === 'switch' ? switchState : routerState;
+            // ★改良: テンプレートからディープコピーして現在の状態を生成（完全分離）
+            let deviceState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
 
-            // ★改良: ターミナルへ追加する際、機器ごとの状態(screenLog)にも保存する
             function appendToTerminal(text) {
                 if (!deviceState.screenLog) deviceState.screenLog = [];
                 deviceState.screenLog.push(text);
@@ -135,7 +135,6 @@
                 terminal.scrollTop = terminal.scrollHeight;
             }
 
-            // ★改良: 機器の状態に保存された画面履歴を描画し直す関数
             function renderTerminal() {
                 terminal.innerHTML = '';
                 if (deviceState.screenLog && deviceState.screenLog.length > 0) {
@@ -146,7 +145,6 @@
                         terminal.appendChild(div);
                     });
                 } else {
-                    // 何も保存されていない場合は初期メッセージを出力
                     appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                     appendToTerminal('Press ENTER to continue...');
                 }
@@ -203,34 +201,36 @@
 
             function switchToDeviceMode(mode) {
                 if (mode === 'switch') {
-                    deviceType = 'switch'; deviceState = switchState;
+                    deviceType = 'switch'; 
+                    deviceState = JSON.parse(JSON.stringify(initialSwitchState)); // ★リセット
                     switchModeBtn.classList.add('active'); routerModeBtn.classList.remove('active');
                     updateSwitchHelpContent();
                 } else {
-                    deviceType = 'router'; deviceState = routerState;
+                    deviceType = 'router'; 
+                    deviceState = JSON.parse(JSON.stringify(initialRouterState)); // ★リセット
                     routerModeBtn.classList.add('active'); switchModeBtn.classList.remove('active');
                     updateRouterHelpContent();
                 }
                 
-                if (deviceState.commandHistory) {
-                    commandHistory = deviceState.commandHistory;
-                    historyIndex = commandHistory.length;
-                }
+                commandHistory = [];
+                historyIndex = 0;
 
                 if (!isInitialized) initializeEngine();
                 else {
+                    clearTerminal();
                     renderTerminal();
                     updatePrompt();
                 }
             }
             
             function onResetConfirmed() {
+                // ★改良: リセット時もテンプレートから完全にコピーして初期化
+                deviceState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
                 clearTerminal();
                 appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                 appendToTerminal('Press ENTER to continue...');
                 updatePrompt();
                 commandHistory = [];
-                deviceState.commandHistory = [];
                 commandInput.focus();
             }
 
@@ -740,11 +740,11 @@
                     commandInput.value = '';
                     appendToTerminal(`${promptSpan.textContent} ${val}`);
                     
-                    // ★改良: 実行したコマンドを機器ごとの履歴にも保存
+                    // ★改良: 実行したコマンドを確実にコピーして保存
                     if (val) { 
                         commandHistory.push(val); 
                         historyIndex = commandHistory.length; 
-                        deviceState.commandHistory = commandHistory;
+                        deviceState.commandHistory = [...commandHistory]; 
                     }
                     processCommand(val);
                 }
@@ -765,19 +765,22 @@
                             if (msg.deviceType && msg.deviceType !== deviceType) {
                                 deviceType = msg.deviceType;
                             }
-                            // 親システムから送られてきた状態（画面ログ・履歴含む）で上書き
-                            Object.assign(deviceState, msg.payload);
                             
-                            // 履歴配列の復旧
-                            if (deviceState.commandHistory) {
-                                commandHistory = deviceState.commandHistory;
-                                historyIndex = commandHistory.length;
-                            }
+                            // ★重要: 単純上書きをやめ、クリーンな状態をベースにしてマージする
+                            const baseState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
+                            deviceState = Object.assign(baseState, msg.payload);
+                            
+                            // 古いデータフォーマットの互換性対策
+                            if (!deviceState.screenLog) deviceState.screenLog = [];
+                            if (!deviceState.commandHistory) deviceState.commandHistory = [];
+                            
+                            // 履歴配列の復旧（参照を切るためコピー）
+                            commandHistory = [...deviceState.commandHistory];
+                            historyIndex = commandHistory.length;
 
                             if (!isInitialized) {
                                 initializeEngine();
                             } else {
-                                // すでに起動済みの場合は画面だけ再描画して復元
                                 renderTerminal();
                                 updatePrompt();
                             }
@@ -789,7 +792,6 @@
             });
             window.parent.postMessage({ type: 'ENGINE_READY' }, '*');
             
-            // ★改良: 親システムからの LOAD_STATE を待つ（指定がなければ0.5秒後にRouterで起動）
             if (paramHostname) {
                 initializeEngine();
             } else {
