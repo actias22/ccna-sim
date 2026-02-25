@@ -15,7 +15,7 @@
         button.active { background-color: #004488; font-weight: bold; }
         .terminal-container { flex: 1; display: flex; flex-direction: column; border: 1px solid #333; border-radius: 5px; overflow: hidden; min-height: 400px; }
         #terminal { flex: 1; background-color: #000; color: #33ff33; padding: 10px; overflow-y: auto; font-size: 14px; white-space: pre-wrap; }
-        .input-area { display: flex; background-color: #000; border-top: 1px solid #333; padding: 5px; visibility: hidden; /* 初期化完了まで隠す */ }
+        .input-area { display: flex; background-color: #000; border-top: 1px solid #333; padding: 5px; visibility: hidden; }
         #prompt { color: #33ff33; padding: 5px; font-family: 'Courier New', monospace; font-size: 14px; }
         #command-input { flex: 1; background-color: #000; color: #33ff33; border: none; padding: 5px; font-family: 'Courier New', monospace; font-size: 14px; }
         #command-input:focus { outline: none; }
@@ -28,7 +28,7 @@
 <body>
     <div class="mode-selector">
         <button id="switch-mode-btn">スイッチモード</button>
-        <button id="router-mode-btn">ルーターモード</button>
+        <button id="router-mode-btn" class="active">ルーターモード</button>
     </div>
     <div class="controls">
         <button id="reset-btn">リセット</button>
@@ -62,18 +62,16 @@
                 console.error('エラー:', message, source, lineno); return true;
             };
 
-            // ★改良: URLパラメータから初期設定を取得
             const urlParams = new URLSearchParams(window.location.search);
             const paramType = urlParams.get('type'); 
             const paramHostname = urlParams.get('hostname');
 
-            // デフォルト設定 (URLパラメータがあればそれを優先、なければ Router)
             let deviceType = paramType === 'switch' ? 'switch' : 'router';
             const initialHostname = paramHostname ? paramHostname : (deviceType === 'switch' ? 'Switch' : 'Router');
 
             let commandHistory = [];
             let historyIndex = 0;
-            let isInitialized = false; // 初期化済みフラグ
+            let isInitialized = false;
 
             const simulatedTopology = {
                 neighbors: {
@@ -85,9 +83,10 @@
             const defaultSwitchInterfaces = { "Ethernet0/0": {}, "Ethernet0/1": {}, "Ethernet0/2": {}, "Ethernet0/3": {}, "GigabitEthernet0/1": {} };
             const defaultRouterInterfaces = { "GigabitEthernet0/0": {}, "GigabitEthernet0/1": {} };
 
-            // ★改良: 初期ホスト名を反映
+            // ★改良: 画面履歴(screenLog)と入力履歴(commandHistory)を状態として追加
             const switchState = {
                 mode: 'user', hostname: initialHostname, 
+                screenLog: [], commandHistory: [],
                 interfaces: JSON.parse(JSON.stringify(defaultSwitchInterfaces)), 
                 vlans: { '1': { name: 'default', status: 'active' } },
                 currentInterface: null, currentInterfaceRange: [], currentVlan: null, currentLine: null, currentAcl: null, configStack: [],
@@ -105,6 +104,7 @@
 
             const routerState = {
                 mode: 'user', hostname: initialHostname, 
+                screenLog: [], commandHistory: [],
                 interfaces: JSON.parse(JSON.stringify(defaultRouterInterfaces)), 
                 currentInterface: null, currentInterfaceRange: [], currentLine: null, currentAcl: null, configStack: [],
                 cdpEnabled: true, runningConfig: {
@@ -121,7 +121,12 @@
 
             let deviceState = deviceType === 'switch' ? switchState : routerState;
 
+            // ★改良: ターミナルへ追加する際、機器ごとの状態(screenLog)にも保存する
             function appendToTerminal(text) {
+                if (!deviceState.screenLog) deviceState.screenLog = [];
+                deviceState.screenLog.push(text);
+                if (deviceState.screenLog.length > 5000) deviceState.screenLog.shift();
+
                 const div = document.createElement('div');
                 div.style.whiteSpace = 'pre-wrap';
                 div.textContent = text;
@@ -129,14 +134,34 @@
                 while (terminal.childNodes.length > 5000) terminal.removeChild(terminal.firstChild);
                 terminal.scrollTop = terminal.scrollHeight;
             }
-            function clearTerminal() { terminal.innerHTML = ''; }
+
+            // ★改良: 機器の状態に保存された画面履歴を描画し直す関数
+            function renderTerminal() {
+                terminal.innerHTML = '';
+                if (deviceState.screenLog && deviceState.screenLog.length > 0) {
+                    deviceState.screenLog.forEach(text => {
+                        const div = document.createElement('div');
+                        div.style.whiteSpace = 'pre-wrap';
+                        div.textContent = text;
+                        terminal.appendChild(div);
+                    });
+                } else {
+                    // 何も保存されていない場合は初期メッセージを出力
+                    appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
+                    appendToTerminal('Press ENTER to continue...');
+                }
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+
+            function clearTerminal() { 
+                terminal.innerHTML = ''; 
+                if (deviceState) deviceState.screenLog = [];
+            }
             
-            // ★改良: 初期化関数
             function initializeEngine() {
                 if (isInitialized) return;
                 isInitialized = true;
                 
-                // UIのモードボタン更新
                 if (deviceType === 'switch') {
                     switchModeBtn.classList.add('active');
                     routerModeBtn.classList.remove('active');
@@ -147,12 +172,9 @@
                     updateRouterHelpContent();
                 }
 
-                clearTerminal();
-                appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
-                appendToTerminal('Press ENTER to continue...');
+                renderTerminal();
                 updatePrompt();
                 
-                // 入力エリアを表示
                 inputArea.style.visibility = 'visible';
                 commandInput.focus();
             }
@@ -189,16 +211,26 @@
                     routerModeBtn.classList.add('active'); switchModeBtn.classList.remove('active');
                     updateRouterHelpContent();
                 }
-                // 初期化済みならメッセージ再表示はしない（状態ロード時に呼ばれるため）
+                
+                if (deviceState.commandHistory) {
+                    commandHistory = deviceState.commandHistory;
+                    historyIndex = commandHistory.length;
+                }
+
                 if (!isInitialized) initializeEngine();
-                else updatePrompt();
+                else {
+                    renderTerminal();
+                    updatePrompt();
+                }
             }
             
             function onResetConfirmed() {
-                terminal.innerHTML = '';
+                clearTerminal();
                 appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                 appendToTerminal('Press ENTER to continue...');
                 updatePrompt();
+                commandHistory = [];
+                deviceState.commandHistory = [];
                 commandInput.focus();
             }
 
@@ -640,7 +672,7 @@
                     else deviceState.runningConfig.vlans[deviceState.currentVlan].name = args[1];
                 }
                 else if (mainCommand === 'exit') { deviceState.mode = deviceState.configStack.pop(); updatePrompt(); }
-                else if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); }
+                else if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); return; }
                 else appendToTerminal('% Invalid input detected at \'^\'');
             }
 
@@ -707,7 +739,13 @@
                     const val = commandInput.value.trim();
                     commandInput.value = '';
                     appendToTerminal(`${promptSpan.textContent} ${val}`);
-                    if (val) { commandHistory.push(val); historyIndex = commandHistory.length; }
+                    
+                    // ★改良: 実行したコマンドを機器ごとの履歴にも保存
+                    if (val) { 
+                        commandHistory.push(val); 
+                        historyIndex = commandHistory.length; 
+                        deviceState.commandHistory = commandHistory;
+                    }
                     processCommand(val);
                 }
             });
@@ -724,11 +762,25 @@
                     case 'GET_STATE': window.parent.postMessage({ type: 'STATE_RESPONSE', payload: JSON.parse(JSON.stringify(deviceState)) }, '*'); break;
                     case 'LOAD_STATE':
                          if (msg.payload) {
-                            if (msg.deviceType && msg.deviceType !== deviceType) switchToDeviceMode(msg.deviceType);
+                            if (msg.deviceType && msg.deviceType !== deviceType) {
+                                deviceType = msg.deviceType;
+                            }
+                            // 親システムから送られてきた状態（画面ログ・履歴含む）で上書き
                             Object.assign(deviceState, msg.payload);
-                            // ★改良: データロード完了時に初期化する（まだの場合）
-                            if (!isInitialized) initializeEngine();
-                            else updatePrompt();
+                            
+                            // 履歴配列の復旧
+                            if (deviceState.commandHistory) {
+                                commandHistory = deviceState.commandHistory;
+                                historyIndex = commandHistory.length;
+                            }
+
+                            if (!isInitialized) {
+                                initializeEngine();
+                            } else {
+                                // すでに起動済みの場合は画面だけ再描画して復元
+                                renderTerminal();
+                                updatePrompt();
+                            }
                          }
                          break;
                     case 'RESET_REQUEST': window.parent.postMessage({ type: 'RESET_REQUEST' }, '*'); break;
@@ -737,11 +789,10 @@
             });
             window.parent.postMessage({ type: 'ENGINE_READY' }, '*');
             
-            // ★改良: 親からのデータを待つか、パラメータがあれば即起動
+            // ★改良: 親システムからの LOAD_STATE を待つ（指定がなければ0.5秒後にRouterで起動）
             if (paramHostname) {
                 initializeEngine();
             } else {
-                // データが来ない場合のフォールバック (0.5秒後に強制起動)
                 setTimeout(() => {
                     if (!isInitialized) initializeEngine();
                 }, 500);
