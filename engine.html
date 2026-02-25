@@ -15,7 +15,7 @@
         button.active { background-color: #004488; font-weight: bold; }
         .terminal-container { flex: 1; display: flex; flex-direction: column; border: 1px solid #333; border-radius: 5px; overflow: hidden; min-height: 400px; }
         #terminal { flex: 1; background-color: #000; color: #33ff33; padding: 10px; overflow-y: auto; font-size: 14px; white-space: pre-wrap; }
-        .input-area { display: flex; background-color: #000; border-top: 1px solid #333; padding: 5px; }
+        .input-area { display: flex; background-color: #000; border-top: 1px solid #333; padding: 5px; visibility: hidden; /* 初期化完了まで隠す */ }
         #prompt { color: #33ff33; padding: 5px; font-family: 'Courier New', monospace; font-size: 14px; }
         #command-input { flex: 1; background-color: #000; color: #33ff33; border: none; padding: 5px; font-family: 'Courier New', monospace; font-size: 14px; }
         #command-input:focus { outline: none; }
@@ -27,7 +27,7 @@
 </head>
 <body>
     <div class="mode-selector">
-        <button id="switch-mode-btn" class="active">スイッチモード</button>
+        <button id="switch-mode-btn">スイッチモード</button>
         <button id="router-mode-btn">ルーターモード</button>
     </div>
     <div class="controls">
@@ -37,7 +37,7 @@
     <div class="terminal-container">
         <div id="terminal"></div>
         <div class="input-area">
-            <span id="prompt">Switch&gt;</span>
+            <span id="prompt">Router&gt;</span>
             <input type="text" id="command-input" autofocus="" autocomplete="off">
         </div>
     </div>
@@ -50,6 +50,7 @@
             const terminal = document.getElementById('terminal');
             const promptSpan = document.getElementById('prompt');
             const commandInput = document.getElementById('command-input');
+            const inputArea = document.querySelector('.input-area');
             const resetBtn = document.getElementById('reset-btn');
             const toggleHelpBtn = document.getElementById('toggle-help');
             const helpPanel = document.getElementById('help-panel');
@@ -61,9 +62,18 @@
                 console.error('エラー:', message, source, lineno); return true;
             };
 
-            let deviceType = 'switch';
+            // ★改良: URLパラメータから初期設定を取得
+            const urlParams = new URLSearchParams(window.location.search);
+            const paramType = urlParams.get('type'); 
+            const paramHostname = urlParams.get('hostname');
+
+            // デフォルト設定 (URLパラメータがあればそれを優先、なければ Router)
+            let deviceType = paramType === 'switch' ? 'switch' : 'router';
+            const initialHostname = paramHostname ? paramHostname : (deviceType === 'switch' ? 'Switch' : 'Router');
+
             let commandHistory = [];
             let historyIndex = 0;
+            let isInitialized = false; // 初期化済みフラグ
 
             const simulatedTopology = {
                 neighbors: {
@@ -75,13 +85,14 @@
             const defaultSwitchInterfaces = { "Ethernet0/0": {}, "Ethernet0/1": {}, "Ethernet0/2": {}, "Ethernet0/3": {}, "GigabitEthernet0/1": {} };
             const defaultRouterInterfaces = { "GigabitEthernet0/0": {}, "GigabitEthernet0/1": {} };
 
+            // ★改良: 初期ホスト名を反映
             const switchState = {
-                mode: 'user', hostname: 'Switch', 
+                mode: 'user', hostname: initialHostname, 
                 interfaces: JSON.parse(JSON.stringify(defaultSwitchInterfaces)), 
                 vlans: { '1': { name: 'default', status: 'active' } },
                 currentInterface: null, currentInterfaceRange: [], currentVlan: null, currentLine: null, currentAcl: null, configStack: [],
                 cdpEnabled: true, runningConfig: {
-                    hostname: 'Switch', 
+                    hostname: initialHostname, 
                     interfaces: JSON.parse(JSON.stringify(defaultSwitchInterfaces)), 
                     vlans: { '1': { name: 'default', status: 'active' } },
                     security: { users: {}, portSecurity: {}, sshKeysGenerated: false },
@@ -93,11 +104,11 @@
             };
 
             const routerState = {
-                mode: 'user', hostname: 'Router', 
-                interfaces: JSON.parse(JSON.stringify(defaultRouterInterfaces)),
+                mode: 'user', hostname: initialHostname, 
+                interfaces: JSON.parse(JSON.stringify(defaultRouterInterfaces)), 
                 currentInterface: null, currentInterfaceRange: [], currentLine: null, currentAcl: null, configStack: [],
                 cdpEnabled: true, runningConfig: {
-                    hostname: 'Router', 
+                    hostname: initialHostname, 
                     interfaces: JSON.parse(JSON.stringify(defaultRouterInterfaces)), 
                     routing: { staticRoutes: [] },
                     security: { users: {}, portSecurity: {}, sshKeysGenerated: false },
@@ -108,7 +119,7 @@
                 }
             };
 
-            let deviceState = switchState;
+            let deviceState = deviceType === 'switch' ? switchState : routerState;
 
             function appendToTerminal(text) {
                 const div = document.createElement('div');
@@ -119,10 +130,31 @@
                 terminal.scrollTop = terminal.scrollHeight;
             }
             function clearTerminal() { terminal.innerHTML = ''; }
-            function displayWelcomeMessage() {
+            
+            // ★改良: 初期化関数
+            function initializeEngine() {
+                if (isInitialized) return;
+                isInitialized = true;
+                
+                // UIのモードボタン更新
+                if (deviceType === 'switch') {
+                    switchModeBtn.classList.add('active');
+                    routerModeBtn.classList.remove('active');
+                    updateSwitchHelpContent();
+                } else {
+                    routerModeBtn.classList.add('active');
+                    switchModeBtn.classList.remove('active');
+                    updateRouterHelpContent();
+                }
+
                 clearTerminal();
                 appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
                 appendToTerminal('Press ENTER to continue...');
+                updatePrompt();
+                
+                // 入力エリアを表示
+                inputArea.style.visibility = 'visible';
+                commandInput.focus();
             }
 
             function updatePrompt() {
@@ -157,12 +189,15 @@
                     routerModeBtn.classList.add('active'); switchModeBtn.classList.remove('active');
                     updateRouterHelpContent();
                 }
-                displayWelcomeMessage(); updatePrompt();
+                // 初期化済みならメッセージ再表示はしない（状態ロード時に呼ばれるため）
+                if (!isInitialized) initializeEngine();
+                else updatePrompt();
             }
             
             function onResetConfirmed() {
                 terminal.innerHTML = '';
-                displayWelcomeMessage();
+                appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
+                appendToTerminal('Press ENTER to continue...');
                 updatePrompt();
                 commandInput.focus();
             }
@@ -238,17 +273,14 @@
                     candidates = ['nat', 'route', 'interface'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 4 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip' && words[2] === 'nat') {
                     candidates = ['translations'].filter(cmd => cmd.startsWith(lastWord));
-                // ★追加: ip access-list extended
                 } else if (words.length === 2 && words[0] === 'ip') {
                     candidates = ['access-list', 'route', 'nat', 'ssh', 'dhcp'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
                     candidates = ['extended', 'standard'].filter(cmd => cmd.startsWith(lastWord));
-                // ★追加: transport input telnet
                 } else if (words.length === 2 && words[0] === 'transport') {
                     candidates = ['input'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 3 && words[0] === 'transport' && words[1] === 'input') {
                     candidates = ['telnet', 'ssh', 'all', 'none'].filter(cmd => cmd.startsWith(lastWord));
-                // ★追加: switchport port-security
                 } else if (words.length === 2 && words[0] === 'switchport') {
                     candidates = ['mode', 'access', 'port-security'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 1) {
@@ -608,7 +640,7 @@
                     else deviceState.runningConfig.vlans[deviceState.currentVlan].name = args[1];
                 }
                 else if (mainCommand === 'exit') { deviceState.mode = deviceState.configStack.pop(); updatePrompt(); }
-                else if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); return; }
+                else if (mainCommand === 'end') { deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt(); }
                 else appendToTerminal('% Invalid input detected at \'^\'');
             }
 
@@ -693,7 +725,10 @@
                     case 'LOAD_STATE':
                          if (msg.payload) {
                             if (msg.deviceType && msg.deviceType !== deviceType) switchToDeviceMode(msg.deviceType);
-                            Object.assign(deviceState, msg.payload); updatePrompt();
+                            Object.assign(deviceState, msg.payload);
+                            // ★改良: データロード完了時に初期化する（まだの場合）
+                            if (!isInitialized) initializeEngine();
+                            else updatePrompt();
                          }
                          break;
                     case 'RESET_REQUEST': window.parent.postMessage({ type: 'RESET_REQUEST' }, '*'); break;
@@ -701,7 +736,17 @@
                 }
             });
             window.parent.postMessage({ type: 'ENGINE_READY' }, '*');
-            displayWelcomeMessage(); updatePrompt();
+            
+            // ★改良: 親からのデータを待つか、パラメータがあれば即起動
+            if (paramHostname) {
+                initializeEngine();
+            } else {
+                // データが来ない場合のフォールバック (0.5秒後に強制起動)
+                setTimeout(() => {
+                    if (!isInitialized) initializeEngine();
+                }, 500);
+            }
+            
             updateSwitchHelpContent();
         });
     </script>
