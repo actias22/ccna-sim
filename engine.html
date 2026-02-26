@@ -83,7 +83,6 @@
             const defaultSwitchInterfaces = { "Ethernet0/0": {}, "Ethernet0/1": {}, "Ethernet0/2": {}, "Ethernet0/3": {}, "GigabitEthernet0/1": {} };
             const defaultRouterInterfaces = { "GigabitEthernet0/0": {}, "GigabitEthernet0/1": {} };
 
-            // ★改良: テンプレートとして定数を定義（直接書き換えないためのマスターデータ）
             const initialSwitchState = {
                 mode: 'user', hostname: initialHostname, 
                 screenLog: [], commandHistory: [],
@@ -119,7 +118,6 @@
                 }
             };
 
-            // ★改良: テンプレートからディープコピーして現在の状態を生成（完全分離）
             let deviceState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
 
             function appendToTerminal(text) {
@@ -202,12 +200,12 @@
             function switchToDeviceMode(mode) {
                 if (mode === 'switch') {
                     deviceType = 'switch'; 
-                    deviceState = JSON.parse(JSON.stringify(initialSwitchState)); // ★リセット
+                    deviceState = JSON.parse(JSON.stringify(initialSwitchState));
                     switchModeBtn.classList.add('active'); routerModeBtn.classList.remove('active');
                     updateSwitchHelpContent();
                 } else {
                     deviceType = 'router'; 
-                    deviceState = JSON.parse(JSON.stringify(initialRouterState)); // ★リセット
+                    deviceState = JSON.parse(JSON.stringify(initialRouterState));
                     routerModeBtn.classList.add('active'); switchModeBtn.classList.remove('active');
                     updateRouterHelpContent();
                 }
@@ -224,7 +222,6 @@
             }
             
             function onResetConfirmed() {
-                // ★改良: リセット時もテンプレートから完全にコピーして初期化
                 deviceState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
                 clearTerminal();
                 appendToTerminal(deviceType === 'switch' ? 'Cisco IOS Software, C2960...' : 'Cisco IOS Software, C1900...');
@@ -740,7 +737,6 @@
                     commandInput.value = '';
                     appendToTerminal(`${promptSpan.textContent} ${val}`);
                     
-                    // ★改良: 実行したコマンドを確実にコピーして保存
                     if (val) { 
                         commandHistory.push(val); 
                         historyIndex = commandHistory.length; 
@@ -766,15 +762,12 @@
                                 deviceType = msg.deviceType;
                             }
                             
-                            // ★重要: 単純上書きをやめ、クリーンな状態をベースにしてマージする
                             const baseState = JSON.parse(JSON.stringify(deviceType === 'switch' ? initialSwitchState : initialRouterState));
                             deviceState = Object.assign(baseState, msg.payload);
                             
-                            // 古いデータフォーマットの互換性対策
                             if (!deviceState.screenLog) deviceState.screenLog = [];
                             if (!deviceState.commandHistory) deviceState.commandHistory = [];
                             
-                            // 履歴配列の復旧（参照を切るためコピー）
                             commandHistory = [...deviceState.commandHistory];
                             historyIndex = commandHistory.length;
 
@@ -792,12 +785,9 @@
             });
             window.parent.postMessage({ type: 'ENGINE_READY' }, '*');
             
-            if (paramHostname) {
+            // ★修正: パラメータがある場合のみ即座に初期化し、それ以外は LOAD_STATE を無期限で待つ（真っ暗な状態を維持）
+            if (paramHostname || paramType) {
                 initializeEngine();
-            } else {
-                setTimeout(() => {
-                    if (!isInitialized) initializeEngine();
-                }, 500);
             }
             
             updateSwitchHelpContent();
