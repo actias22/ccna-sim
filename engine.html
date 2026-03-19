@@ -73,22 +73,15 @@
             let historyIndex = 0;
             let isInitialized = false;
 
-            const simulatedTopology = {
-                neighbors: {
-                    "Switch": { type: "WS-C2960-24TC-L", ip: "192.168.1.2", interfaces: { "GigabitEthernet0/1": { localPort: "GigabitEthernet0/1", remotePort: "GigabitEthernet1/0/1", remoteName: "Router", remoteType: "CISCO1941", remoteIp: "192.168.1.1", capabilities: ["R", "I"] } } },
-                    "Router": { type: "CISCO1941", ip: "192.168.1.1", interfaces: { "GigabitEthernet0/0": { localPort: "GigabitEthernet0/0", remotePort: "GigabitEthernet0/1", remoteName: "Switch", remoteType: "WS-C2960-24TC-L", remoteIp: "192.168.1.2", capabilities: ["S", "I"] } } }
-                }
-            };
-
             const defaultSwitchInterfaces = { "Ethernet0/0": {}, "Ethernet0/1": {}, "Ethernet0/2": {}, "Ethernet0/3": {}, "GigabitEthernet0/1": {} };
-            const defaultRouterInterfaces = { "GigabitEthernet0/0": {}, "GigabitEthernet0/1": {} };
+            const defaultRouterInterfaces = { "Ethernet0/0": {}, "Ethernet0/1": {}, "GigabitEthernet0/0": {}, "GigabitEthernet0/1": {} };
 
             const initialSwitchState = {
                 mode: 'user', hostname: initialHostname, 
                 screenLog: [], commandHistory: [],
                 interfaces: JSON.parse(JSON.stringify(defaultSwitchInterfaces)), 
                 vlans: { '1': { name: 'default', status: 'active' } },
-                currentInterface: null, currentInterfaceRange: [], currentVlan: null, currentLine: null, currentAcl: null, configStack: [],
+                currentInterface: null, currentInterfaceRange: [], currentVlan: null, currentLine: null, currentAcl: null, currentRouterProcess: null, configStack: [],
                 cdpEnabled: true, runningConfig: {
                     hostname: initialHostname, 
                     interfaces: JSON.parse(JSON.stringify(defaultSwitchInterfaces)), 
@@ -105,11 +98,11 @@
                 mode: 'user', hostname: initialHostname, 
                 screenLog: [], commandHistory: [],
                 interfaces: JSON.parse(JSON.stringify(defaultRouterInterfaces)), 
-                currentInterface: null, currentInterfaceRange: [], currentLine: null, currentAcl: null, configStack: [],
+                currentInterface: null, currentInterfaceRange: [], currentLine: null, currentAcl: null, currentRouterProcess: null, configStack: [],
                 cdpEnabled: true, runningConfig: {
                     hostname: initialHostname, 
                     interfaces: JSON.parse(JSON.stringify(defaultRouterInterfaces)), 
-                    routing: { staticRoutes: [] },
+                    routing: { staticRoutes: [], ospf: {} },
                     security: { users: {}, portSecurity: {}, sshKeysGenerated: false },
                     lines: {}, acls: {}, cdp: { enabled: true, interfaces: {} },
                     lldp: { enabled: false, interfaces: {} },
@@ -186,6 +179,7 @@
                     case 'vlan': prompt += '(config-vlan)#'; break;
                     case 'line': prompt += '(config-line)#'; break;
                     case 'acl': prompt += '(config-ext-nacl)#'; break;
+                    case 'router': prompt += '(config-router)#'; break;
                 }
                 promptSpan.textContent = prompt;
             }
@@ -194,7 +188,7 @@
                 helpContent.innerHTML = `<h3>モード移行</h3><ul><li>enable</li><li>conf t</li><li>exit</li></ul><h3>設定</h3><ul><li>vlan [id]</li><li>int range</li><li>switchport access vlan [id]</li><li>cdp/lldp run</li></ul>`;
             }
             function updateRouterHelpContent() {
-                 helpContent.innerHTML = `<h3>モード移行</h3><ul><li>enable</li><li>conf t</li></ul><h3>診断</h3><ul><li>ping</li><li>traceroute</li></ul>`;
+                 helpContent.innerHTML = `<h3>モード移行</h3><ul><li>enable</li><li>conf t</li></ul><h3>ルーティング/診断</h3><ul><li>router ospf</li><li>ip route</li><li>ping</li><li>traceroute</li><li>show ip interface brief</li></ul>`;
             }
 
             function switchToDeviceMode(mode) {
@@ -271,13 +265,14 @@
 
             const commandVocabulary = {
                 'user': ['enable', 'ping', 'traceroute', 'ssh', 'show', 'sh', 'exit'],
-                'privileged': ['configure', 'terminal', 'copy', 'write', 'show', 'sh', 'ping', 'traceroute', 'exit', 'vlan', 'delete', 'erase'],
+                'privileged': ['configure', 'terminal', 'copy', 'write', 'show', 'sh', 'ping', 'traceroute', 'exit', 'vlan', 'delete', 'erase', 'clear'],
                 'config': ['hostname', 'interface', 'ip', 'username', 'line', 'vlan', 'cdp', 'lldp', 'no', 'exit', 'end', 'ntp', 'router'],
                 'interface': ['ip', 'shutdown', 'shut', 'no', 'switchport', 'cdp', 'lldp', 'exit', 'end', 'description'],
                 'interface-range': ['ip', 'shutdown', 'shut', 'no', 'switchport', 'cdp', 'lldp', 'exit', 'end', 'description'],
                 'vlan': ['name', 'exit', 'end', 'no'],
                 'line': ['transport', 'login', 'password', 'exit', 'end', 'no'],
-                'acl': ['permit', 'deny', 'remark', 'no', 'exit', 'end']
+                'acl': ['permit', 'deny', 'remark', 'no', 'exit', 'end'],
+                'router': ['router-id', 'network', 'passive-interface', 'default-information', 'exit', 'end', 'no']
             };
 
             function handleTabCompletion(e) {
@@ -296,14 +291,24 @@
                     candidates = ['transmit', 'receive'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 3 && words[0] === 'no' && words[1] === 'lldp') {
                     candidates = ['transmit', 'receive'].filter(cmd => cmd.startsWith(lastWord));
+                } else if (words.length === 2 && words[0] === 'clear') {
+                    candidates = ['ip'].filter(cmd => cmd.startsWith(lastWord));
+                } else if (words.length === 3 && words[0] === 'clear' && words[1] === 'ip') {
+                    candidates = ['ospf'].filter(cmd => cmd.startsWith(lastWord));
+                } else if (words.length === 4 && words[0] === 'clear' && words[1] === 'ip' && words[2] === 'ospf') {
+                    candidates = ['process'].filter(cmd => cmd.startsWith(lastWord));
+                } else if (words.length === 2 && words[0] === 'router') {
+                    candidates = ['ospf', 'rip', 'eigrp'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 2 && (words[0] === 'show' || words[0] === 'sh')) {
                     candidates = ['ip', 'running-config', 'vlan', 'mac-address-table'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 3 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip') {
-                    candidates = ['nat', 'route', 'interface'].filter(cmd => cmd.startsWith(lastWord));
+                    candidates = ['nat', 'route', 'interface', 'ospf'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 4 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip' && words[2] === 'nat') {
                     candidates = ['translations'].filter(cmd => cmd.startsWith(lastWord));
+                } else if (words.length === 4 && (words[0] === 'show' || words[0] === 'sh') && words[1] === 'ip' && (words[2] === 'interface' || words[2] === 'int')) {
+                    candidates = ['brief'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 2 && words[0] === 'ip') {
-                    candidates = ['access-list', 'route', 'nat', 'ssh', 'dhcp'].filter(cmd => cmd.startsWith(lastWord));
+                    candidates = ['access-list', 'route', 'nat', 'ssh', 'dhcp', 'ospf', 'address'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 3 && words[0] === 'ip' && words[1] === 'access-list') {
                     candidates = ['extended', 'standard'].filter(cmd => cmd.startsWith(lastWord));
                 } else if (words.length === 2 && words[0] === 'transport') {
@@ -376,6 +381,16 @@
             function processPrivilegedModeCommand(mainCommand, args) {
                 if (mainCommand.startsWith('conf')) { deviceState.mode = 'config'; deviceState.configStack.push('privileged'); appendToTerminal('Enter configuration commands, one per line.  End with CNTL/Z.'); }
                 else if (mainCommand === 'exit') deviceState.mode = 'user';
+                else if (mainCommand === 'clear') {
+                    if (args.length >= 4 && args[1] === 'ip' && args[2] === 'ospf' && (args[3] === 'process' || args[3] === 'proc')) {
+                        appendToTerminal('Reset ALL OSPF processes? [no]: yes'); // 簡略化のため即答扱い
+                        if (!deviceState.runningConfig.logs) deviceState.runningConfig.logs = [];
+                        deviceState.runningConfig.logs.push({ command: 'clear', target: 'ip ospf process', raw: args.join(' '), timestamp: Date.now() });
+                        appendToTerminal('OSPF processes reset');
+                    } else {
+                        appendToTerminal('% Invalid input detected at \'^\'');
+                    }
+                }
                 else if (mainCommand === 'copy') {
                     if (args.length >= 3) {
                          const src = args[1]; const dst = args[2];
@@ -418,6 +433,17 @@
                     } else if (args[1] === 'lldp' || args[1] === 'cdp') {
                         appendToTerminal('% Function not fully simulated in show command.');
                     } 
+                    else if (args[1] === 'ip' && (args[2] === 'interface' || args[2] === 'int') && (args[3] === 'brief' || args[3] === 'br')) {
+                        appendToTerminal('Interface              IP-Address      OK? Method Status                Protocol');
+                        Object.keys(deviceState.runningConfig.interfaces).forEach(i => {
+                            const intf = deviceState.runningConfig.interfaces[i];
+                            const ip = intf.ip || 'unassigned';
+                            const method = intf.ip ? 'manual' : 'unset ';
+                            const status = intf.status === 'shutdown' ? 'administratively down' : 'up';
+                            const protocol = intf.status === 'shutdown' ? 'down' : 'up';
+                            appendToTerminal(`${i.padEnd(22)} ${ip.padEnd(15)} YES ${method} ${status.padEnd(21)} ${protocol}`);
+                        });
+                    }
                     else if (args[1] === 'ip' && args[2] === 'nat') {
                         if (args.length < 4) {
                             appendToTerminal('% Incomplete command.');
@@ -460,11 +486,40 @@
                 updatePrompt();
             }
 
+            function processRouterModeCommand(mainCommand, args) {
+                if (mainCommand === 'router-id') {
+                    if (args.length < 2) { appendToTerminal('% Incomplete command.'); return; }
+                    const processId = deviceState.currentRouterProcess;
+                    if (!deviceState.runningConfig.routing.ospf[processId]) deviceState.runningConfig.routing.ospf[processId] = {};
+                    deviceState.runningConfig.routing.ospf[processId].routerId = args[1];
+                } else if (mainCommand === 'exit') {
+                    deviceState.mode = deviceState.configStack.pop() || 'config';
+                    updatePrompt();
+                } else if (mainCommand === 'end') {
+                    deviceState.mode = 'privileged'; deviceState.configStack = []; updatePrompt();
+                } else {
+                    appendToTerminal('% Invalid input detected at \'^\'');
+                }
+            }
+
             function processConfigModeCommand(mainCommand, args) {
                 switch (mainCommand) {
                     case 'hostname': 
                         if(args[1]) { deviceState.hostname = args[1]; deviceState.runningConfig.hostname = args[1]; updatePrompt(); }
                         else { appendToTerminal('% Incomplete command.'); }
+                        break;
+                    case 'router':
+                        if (args[1] === 'ospf') {
+                            if (args.length < 3) { appendToTerminal('% Incomplete command.'); break; }
+                            const processId = args[2];
+                            deviceState.mode = 'router';
+                            deviceState.configStack.push('config');
+                            deviceState.currentRouterProcess = processId;
+                            if (!deviceState.runningConfig.routing) deviceState.runningConfig.routing = { staticRoutes: [], ospf: {} };
+                            if (!deviceState.runningConfig.routing.ospf) deviceState.runningConfig.routing.ospf = {};
+                            if (!deviceState.runningConfig.routing.ospf[processId]) deviceState.runningConfig.routing.ospf[processId] = {};
+                            updatePrompt();
+                        } else { appendToTerminal('% Invalid input detected at \'^\''); }
                         break;
                     case 'int': case 'interface':
                         if (args.length < 2) { appendToTerminal('% Incomplete command.'); break; }
@@ -654,8 +709,25 @@
                              break;
                         case 'ip':
                             if (args.length < 2) { incomplete = true; break; }
-                            if (args[1] === 'access-group') { if (args.length < 4) { incomplete = true; break; } if (!conf.accessGroup) conf.accessGroup = {}; conf.accessGroup[args[3]] = args[2]; }
+                            if (args[1] === 'address' || args[1] === 'add') {
+                                if (args.length < 4) { incomplete = true; break; }
+                                conf.ip = args[2]; conf.mask = args[3];
+                            }
+                            else if (args[1] === 'access-group') { if (args.length < 4) { incomplete = true; break; } if (!conf.accessGroup) conf.accessGroup = {}; conf.accessGroup[args[3]] = args[2]; }
                             else if (args[1] === 'helper-address') { if (args.length < 3) { incomplete = true; break; } conf.ipHelper = args[2]; }
+                            else if (args[1] === 'ospf') {
+                                if (args.length < 3) { incomplete = true; break; }
+                                if (args[2] === 'priority') {
+                                    if (args.length < 4) { incomplete = true; break; }
+                                    if (!conf.ospf) conf.ospf = {};
+                                    conf.ospf.priority = parseInt(args[3]);
+                                } else {
+                                    if (args.length < 5 || args[3] !== 'area') { incomplete = true; break; }
+                                    if (!conf.ospf) conf.ospf = {};
+                                    conf.ospf.processId = args[2];
+                                    conf.ospf.area = args[4];
+                                }
+                            }
                             commandFound = true; break;
                         default: break;
                     }
@@ -712,6 +784,7 @@
                 if (deviceState.mode === 'user') processUserModeCommand(mainCommand, args);
                 else if (deviceState.mode === 'privileged') processPrivilegedModeCommand(mainCommand, args);
                 else if (deviceState.mode === 'config') processConfigModeCommand(mainCommand, args);
+                else if (deviceState.mode === 'router') processRouterModeCommand(mainCommand, args);
                 else if (deviceState.mode.startsWith('interface')) processInterfaceModeCommand(mainCommand, args);
                 else if (deviceState.mode === 'vlan') processVlanModeCommand(mainCommand, args);
                 else if (deviceState.mode === 'acl') processAclModeCommand(mainCommand, args);
@@ -785,7 +858,6 @@
             });
             window.parent.postMessage({ type: 'ENGINE_READY' }, '*');
             
-            // ★修正: パラメータがある場合のみ即座に初期化し、それ以外は LOAD_STATE を無期限で待つ（真っ暗な状態を維持）
             if (paramHostname || paramType) {
                 initializeEngine();
             }
