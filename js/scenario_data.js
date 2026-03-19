@@ -196,7 +196,6 @@ const scenarios = [
         expected: "BumBL3d", 
         message: "Sw2: ユーザー AdminGroup のパスワードが正しくありません" 
       },
-      // ★追加: アルゴリズムチェック
       { 
         device: "Sw2", 
         path: "runningConfig.security.users.AdminGroup.algorithm", 
@@ -260,9 +259,9 @@ const scenarios = [
     ],
     devices: [
       { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }, // ★追加
+      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
       { name: "R3", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R4", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }  // ★追加
+      { name: "R4", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
     ],
     validations: [
       // タスク1: R1 -> 10.0.41.10/32 via 10.0.12.2
@@ -331,9 +330,9 @@ SW1のVTYライン0から4にSSHサーバーを設定する。
 – SSHバージョン2を使用する`
     ],
     devices: [
-      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }, // ★追加
+      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
       { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R3", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }, // ★追加
+      { name: "R3", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
       { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
     ],
     validations: [
@@ -456,7 +455,7 @@ SW1のVTYライン0から4にSSHサーバーを設定する。
         message: "R1: R2経由(10.122.12.2)のフローティングスタティックルート(AD 225)が設定されていません"
       },
 
-      // --- タスク2: 障害試験と確認 (今回のご要望箇所) ---
+      // --- タスク2: 障害試験と確認 ---
       // 1. R1のインターフェースシャットダウン確認
       {
         device: "R1",
@@ -624,7 +623,7 @@ SW1のVTYライン0から4にSSHサーバーを設定する。
   },
 
 // -------------------------------------------------------------
-  // Question 7: VLANとCDPの設定 (タスク文言・回答反映版)
+  // Question 7: VLANとCDPの設定
   // -------------------------------------------------------------
   {
     id: "question7",
@@ -685,22 +684,18 @@ SW1のVTYライン0から4にSSHサーバーを設定する。
       },
 
       // --- タスク4 (Sw-1): CDP Configuration ---
-      // cdp run
       { 
         device: "SW-1", 
         path: "runningConfig.cdp.enabled", 
         expected: true, 
         message: "SW-1: CDP がグローバルで有効化されていません (cdp run)" 
       },
-      // int e0/0 -> cdp enable (R1接続ポート)
-      // Note: シミュレータのデフォルト動作にもよりますが、明示的な有効化か、無効化されていないことを確認
       { 
         device: "SW-1", 
         path: "runningConfig.cdp.interfaces.Ethernet0/0", 
         condition: (val) => val !== false, 
         message: "SW-1: Ethernet0/0 で CDP が有効になっていません" 
       },
-      // int range e0/1 - 2 -> no cdp enable (その他ポート)
       { 
         device: "SW-1", 
         path: "runningConfig.cdp.interfaces.Ethernet0/1", 
@@ -716,5 +711,79 @@ SW1のVTYライン0から4にSSHサーバーを設定する。
     ]
   },
 
+// -------------------------------------------------------------
+  // Question 8: OSPFの設定
+  // -------------------------------------------------------------
+  {
+    id: "question8",
+    title: "Question 8",
+    image: "img/ospf_topology.png",
+    description: `
+      <div class="task-section">
+        <p><strong>状況</strong></p>
+        <p>トポロジー図を参照してください。すべての物理ケーブルは正しく接続されています。ルーター2と3にはアクセスできません。ネットワークのOSPFルーティングを設定し、ネットワークステートメントを使用せずにR1がエリア0に参加していることを確認してください。</p>
+      </div>
+    `,
+    tasks: [
+      `タスク 1.
+R1 上でOSPF をプロセス ID とルーターIDのみを使用して以下のように設定します。
+- プロセス IDとして33を使用
+- ルーターIDとしてE0/1 IP (10.0.33.1) を使用`,
 
+      `タスク 2.
+- R1 が R2 およびR3とのネイバー隣接関係を確立するように設定します。OSPF プロセスの network ステートメントは使用しないでください。
+- R1 が常にエリア0のDRになるように設定します。
+- OSPFプロセスをクリアして再選出を促します。`
+    ],
+    devices: [
+      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
+      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
+      { name: "R3", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+    ],
+    validations: [
+      // --- タスク1: OSPF Process 33 & Router ID ---
+      {
+        device: "R1",
+        path: "runningConfig.routing.ospf.33.routerId",
+        expected: "10.0.33.1",
+        message: "R1: OSPFプロセス 33 の router-id が 10.0.33.1 に設定されていません"
+      },
+      
+      // --- タスク2: Interface E0/0 OSPF Config ---
+      {
+        device: "R1",
+        path: "runningConfig.interfaces.Ethernet0/0.ospf.area",
+        expected: "0",
+        message: "R1: Ethernet0/0 が OSPF プロセス 33 の エリア 0 に参加していません (ip ospf 33 area 0)"
+      },
+      {
+        device: "R1",
+        path: "runningConfig.interfaces.Ethernet0/0.ospf.priority",
+        expected: 255,
+        message: "R1: Ethernet0/0 の OSPF priority が 255 に設定されていません"
+      },
+      
+      // --- タスク2: Interface E0/1 OSPF Config ---
+      {
+        device: "R1",
+        path: "runningConfig.interfaces.Ethernet0/1.ospf.area",
+        expected: "0",
+        message: "R1: Ethernet0/1 が OSPF プロセス 33 の エリア 0 に参加していません (ip ospf 33 area 0)"
+      },
+      {
+        device: "R1",
+        path: "runningConfig.interfaces.Ethernet0/1.ospf.priority",
+        expected: 255,
+        message: "R1: Ethernet0/1 の OSPF priority が 255 に設定されていません"
+      },
+
+      // --- タスク2: Clear OSPF Process Log ---
+      {
+        device: "R1",
+        path: "runningConfig.logs",
+        condition: (logs) => logs && logs.some(l => l.command === 'clear' && l.target === 'ip ospf process' || l.raw === 'clear ip ospf process'),
+        message: "R1: DR選出のために OSPFプロセスがクリアされていません (clear ip ospf process)"
+      }
+    ]
+  }
 ];
