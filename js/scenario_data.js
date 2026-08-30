@@ -276,8 +276,8 @@ R2（最後のホストIP）： 2001:db8:12::3/126`
       </div>
     `,
     tasks: [
-      "IEEE 標準フレームタグ付け方式を使用して、ポートEO/0とE0/1 上でSW1 と SW2間のトランクを設定します。<br>またVLAN1,11,12のみが通信出来るように設定します",
-      "vlan12のみを許可するようにSW1のe0/2を設定します",
+      "IEEE 標準フレームタグ付け方式を使用して、ポートEO/0とE0/1 上でSW1 と SW2間のトランクを設定します。<br>またVLAN1,12,22のみが通信出来るように設定します",
+      "vlan12,22を許可するようにSW1のe0/2を設定します",
       "Sw1とSw2でLACPを設定します。<br>E0/0とEO/1を単一の論理リンクに統合し、トランク構成はそのまま維持します。<br>リンクに番号12を割り当てます。<br>両方のリンクでネゴシエーションを行う必要があります。"
     ],
     // ▼ 練習モード用の解答を追加 ▼
@@ -285,12 +285,12 @@ R2（最後のホストIP）： 2001:db8:12::3/126`
 `Sw1,Sw2(config)#interface range e0/0 - 1
 Sw1,Sw2(config-if-range)#switchport trunk encapsulation dot1q
 Sw1,Sw2(config-if-range)#switchport mode trunk
-Sw1,Sw2(config-if-range)#switchport trunk allowed vlan 1,11,12`,
+Sw1,Sw2(config-if-range)#switchport trunk allowed vlan 1,12,22`,
 
 `Sw1(config)#interface e0/2
 Sw1(config-if)#switchport trunk encapsulation dot1q
 Sw1(config-if)#switchport mode trunk
-Sw1(config-if)#switchport trunk allowed vlan 12`,
+Sw1(config-if)#switchport trunk allowed vlan 12,22`,
 
 `Sw1,Sw2(config)#interface range e0/0 - 1
 Sw1,Sw2(config-if-range)#channel-group 12 mode active`
@@ -302,7 +302,7 @@ Sw1,Sw2(config-if-range)#channel-group 12 mode active`
     validations: [
       { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "Sw1: E0/0 のトランクカプセル化が dot1q ではありません" },
       { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.switchport.mode", expected: "trunk", message: "Sw1: E0/0 が trunk モードではありません" },
-      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.switchport.allowed_vlans", match: "containsAll", expected: ["1", "11", "12"], message: "Sw1: E0/0 で VLAN 1, 11, 12 が許可されていません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.switchport.allowed_vlans", match: "containsAll", expected: ["1", "12", "22"], message: "Sw1: E0/0 で VLAN 1, 12, 22 が許可されていません" },
       { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.id", expected: "12", message: "Sw1: E0/0 が channel-group 12 に設定されていません" },
       { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.mode", expected: "active", message: "Sw1: E0/0 の LACPモード が active ではありません" },
       
@@ -311,7 +311,7 @@ Sw1,Sw2(config-if-range)#channel-group 12 mode active`
       
       { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/2.switchport.encapsulation", expected: "dot1q", message: "Sw1: E0/2 のトランクカプセル化が dot1q ではありません" },
       { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "trunk", message: "Sw1: E0/2 が trunk モードではありません" },
-      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/2.switchport.allowed_vlans", match: "contains", expected: "12", message: "Sw1: E0/2 で VLAN 12 が許可されていません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/2.switchport.allowed_vlans", match: "contains", expected: ["12", "22"], message: "Sw1: E0/2 で VLAN 12,22 が許可されていません" },
       
       { device: "Sw1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "Sw1: 設定が保存されていません (copy run start を実行してください)" },
       { device: "Sw2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "Sw2: 設定が保存されていません (copy run start を実行してください)" }
