@@ -297,7 +297,7 @@ Sw1,Sw2(config-if-range)#channel-group 12 mode active`
     ],
     devices: [
       { name: "Sw1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
-      { name: "Sw2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+      { name: "Sw2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] }
     ],
     validations: [
       { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "Sw1: E0/0 のトランクカプセル化が dot1q ではありません" },
