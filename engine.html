@@ -872,6 +872,8 @@
                     }
                     case 'vlan':
                         if (args[1]) {
+                            // ▼ 修正: vlan指定の文字種制限（数字、カンマ、ハイフンのみ許可） ▼
+                            if (!/^[\d,-]+$/.test(args[1])) { showInvalidMarker(rawVal, args, 1); break; }
                             deviceState.mode = 'vlan'; deviceState.configStack.push('config'); deviceState.currentVlan = args[1];
                             if (!deviceState.runningConfig.vlans[args[1]]) deviceState.runningConfig.vlans[args[1]] = { name: `VLAN${args[1]}`, status: 'active' };
                             updatePrompt();
@@ -907,7 +909,6 @@
                          }
                          else showInvalidMarker(rawVal, args, 1);
                          break;
-                    // ▼ 修正: ip route の厳格なバリデーション ▼
                     case 'ip':
                         if (args.length < 2) { appendToTerminal('% Incomplete command.'); break; }
                         if (args[1] === 'route') {
@@ -1019,6 +1020,8 @@
                             break;
                         case 'channel-group':
                             if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
+                            // ▼ 修正: IDの数値チェック ▼
+                            if (!/^\d+$/.test(args[1])) { showInvalidMarker(rawVal, args, 1); return; }
                             if (args[2] !== 'mode') { showInvalidMarker(rawVal, args, 2); return; }
                             if (!['active', 'passive', 'on'].includes(args[3])) { showInvalidMarker(rawVal, args, 3); return; }
                             if (!conf.channelGroup) conf.channelGroup = {};
@@ -1035,11 +1038,15 @@
                                 if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
                                 if (args[2] !== 'vlan') { showInvalidMarker(rawVal, args, 2); return; } 
                                 if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
+                                // ▼ 修正: access vlan は数値のみ許可 ▼
+                                if (!/^\d+$/.test(args[3])) { showInvalidMarker(rawVal, args, 3); return; }
                                 conf.switchport.access_vlan = args[3];
                             } else if (args[1] === 'voice') {
                                 if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
                                 if (args[2] !== 'vlan') { showInvalidMarker(rawVal, args, 2); return; } 
                                 if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
+                                // ▼ 修正: voice vlan は数値のみ許可 ▼
+                                if (!/^\d+$/.test(args[3])) { showInvalidMarker(rawVal, args, 3); return; }
                                 conf.switchport.voice_vlan = args[3];
                             } else if (args[1] === 'trunk') {
                                 if (args.length < 3) { appendToTerminal('% Incomplete command.'); return; }
@@ -1050,12 +1057,19 @@
                                 } else if (args[2] === 'allowed') {
                                     if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
                                     let vlansStr = (args[3] === 'vlan' && args[4]) ? args[4] : (args[3] !== 'vlan' ? args[3] : '');
-                                    if (vlansStr) { conf.switchport.allowed_vlans = vlansStr.split(','); }
+                                    let targetIndex = (args[3] === 'vlan' && args[4]) ? 4 : 3;
+                                    if (vlansStr) { 
+                                        // ▼ 修正: allowed vlan の文字種制限（数字、カンマ、ハイフンのみ許可） ▼
+                                        if (!/^[\d,-]+$/.test(vlansStr)) { showInvalidMarker(rawVal, args, targetIndex); return; }
+                                        conf.switchport.allowed_vlans = vlansStr.split(','); 
+                                    }
                                     else { appendToTerminal('% Incomplete command.'); return; }
                                 } else if (args[2] === 'native') {
                                     if (args.length < 4) { appendToTerminal('% Incomplete command.'); return; }
                                     if (args[3] !== 'vlan') { showInvalidMarker(rawVal, args, 3); return; }
                                     if (args.length < 5) { appendToTerminal('% Incomplete command.'); return; }
+                                    // ▼ 修正: native vlan は数値のみ許可 ▼
+                                    if (!/^\d+$/.test(args[4])) { showInvalidMarker(rawVal, args, 4); return; }
                                     conf.switchport.native_vlan = args[4];
                                 } else { showInvalidMarker(rawVal, args, 2); return; }
                             } else if (args[1] === 'port-security') {
