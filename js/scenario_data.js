@@ -579,6 +579,61 @@ SW-2(config-if-range)# channel-group 12 mode passive`
       { device: "R1", path: "runningConfig.logs", condition: (logs) => logs && logs.some(l => l.command === 'clear' && l.target === 'ip ospf process'), message: "R1: OSPFプロセスのクリアが実行されていません" },
       { device: "R1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R1: 設定が保存されていません (copy run start を実行してください)" }
     ]
+  },
+
+  // -------------------------------------------------------------
+  // 【新】問題⑩: デフォルトルート（スタティックルーティング）
+  // -------------------------------------------------------------
+  {
+    id: "new_q10",
+    title: "【新】問題⑩",
+    image: "img/スクリーンショット 2026-08-30 104054.png", // 必要に応じてファイル名/パスを調整してください
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>DH、HQ、およびブランチ(DC)ルータに対し、インターネット接続のためのデフォルトルート(スタティックルーティング)を正しく設定し、設定を保存してください。</p>
+      </div>
+    `,
+    tasks: [
+      "1. DHからISPへのデフォルトルートを設定する",
+      "2. HQからDH経由でインターネット接続するデフォルトルートを設定する",
+      "3. ブランチ(DC)から最小ホップ数でインターネットへ接続するデフォルトルートを設定する"
+    ],
+    answers: [
+`DH(config)#ip route 0.0.0.0 0.0.0.0 209.165.201.1`,
+
+`HQ(config)#ip route 0.0.0.0 0.0.0.0 10.0.23.1`,
+
+`Branch(config)#ip route 0.0.0.0 0.0.0.0 10.0.44.1`
+    ],
+    devices: [
+      { name: "DH", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
+      { name: "HQ", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
+      { name: "Branch", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+    ],
+    validations: [
+      { 
+        device: "DH", 
+        path: "runningConfig", 
+        condition: (config) => config?.routing?.staticRoutes?.some(r => r.destination === '0.0.0.0' && r.mask === '0.0.0.0' && r.nextHop === '209.165.201.1'), 
+        message: "DH: ISPへのデフォルトルート（209.165.201.1）が正しく設定されていません" 
+      },
+      { 
+        device: "HQ", 
+        path: "runningConfig", 
+        condition: (config) => config?.routing?.staticRoutes?.some(r => r.destination === '0.0.0.0' && r.mask === '0.0.0.0' && r.nextHop === '10.0.23.1'), 
+        message: "HQ: DH経由のデフォルトルート（10.0.23.1）が正しく設定されていません" 
+      },
+      { 
+        device: "Branch", 
+        path: "runningConfig", 
+        condition: (config) => config?.routing?.staticRoutes?.some(r => r.destination === '0.0.0.0' && r.mask === '0.0.0.0' && r.nextHop === '10.0.44.1'), 
+        message: "Branch: インターネットへの最小ホップのデフォルトルート（10.0.44.1）が正しく設定されていません" 
+      },
+      { device: "DH", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "DH: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "HQ", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "HQ: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "Branch", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "Branch: 設定が保存されていません (copy run start を実行してください)" }
+    ]
   }
 
   
