@@ -384,7 +384,6 @@
                 return prefix + match[2];
             }
 
-            // ▼ 修正: ハイフンが含まれる場合のパースエラー処理を強化 ▼
             function parseInterfaceRange(rangeStr) {
                 const interfaces = [];
                 const parts = rangeStr.split(',');
@@ -393,7 +392,6 @@
                     if (part.includes('-')) {
                         const [startStr, endStr] = part.split('-').map(s => s.trim());
                         const normalizedStart = normalizeInterfaceName(startStr);
-                        // Ethernet等の文字が含まれているかをチェック
                         const match = normalizedStart.match(/^([a-zA-Z-]+[\d\/]*\/)?(\d+)$/);
                         if (match && match[1]) {
                             const prefix = match[1];
@@ -402,7 +400,6 @@
                             const endNum = endMatch ? parseInt(endMatch[0]) : startNum;
                             for (let i = startNum; i <= endNum; i++) interfaces.push(`${prefix}${i}`);
                         } else {
-                            // プレフィックスがない場合はそのまま入れる（後続のチェックで弾かれる）
                             interfaces.push(normalizedStart);
                         }
                     } else {
@@ -835,7 +832,6 @@
                             if (args.length < 3) { appendToTerminal('% Incomplete command.'); break; }
                             const targets = parseInterfaceRange(args.slice(2).join(' '));
                             
-                            // ▼ 修正: targetsが空（パース失敗・プレフィックスなし）の場合はエラー ▼
                             if (targets.length === 0) { showInvalidMarker(rawVal, args, 2); break; }
 
                             const invalidFormat = targets.find(t => !validTypesRegex.test(t));
@@ -911,12 +907,38 @@
                          }
                          else showInvalidMarker(rawVal, args, 1);
                          break;
+                    // ▼ 修正: ip route の厳格なバリデーション ▼
                     case 'ip':
                         if (args.length < 2) { appendToTerminal('% Incomplete command.'); break; }
                         if (args[1] === 'route') {
                             if (args.length < 5) { appendToTerminal('% Incomplete command.'); break; }
+                            
+                            const isValidIPv4 = (ipStr) => {
+                                const parts = ipStr.split('.');
+                                if (parts.length !== 4) return false;
+                                return parts.every(p => p !== '' && !isNaN(p) && parseInt(p) >= 0 && parseInt(p) <= 255);
+                            };
+
+                            if (!isValidIPv4(args[2])) { showInvalidMarker(rawVal, args, 2); break; }
+                            if (!isValidIPv4(args[3])) { showInvalidMarker(rawVal, args, 3); break; }
+                            
+                            const isInterface = /^(Ethernet|FastEthernet|GigabitEthernet|Serial|TenGigabitEthernet|Vlan|Loopback|Tunnel|Port-channel|e|fa|gi|se|vl|lo|tu|po)/i.test(args[4]);
+                            if (!isInterface && !isValidIPv4(args[4])) {
+                                showInvalidMarker(rawVal, args, 4); break;
+                            }
+
+                            let distance = 1;
+                            if (args.length === 6) {
+                                if (!/^\d+$/.test(args[5]) || parseInt(args[5]) < 1 || parseInt(args[5]) > 255) {
+                                    showInvalidMarker(rawVal, args, 5); break;
+                                }
+                                distance = parseInt(args[5]);
+                            } else if (args.length >= 7) {
+                                showInvalidMarker(rawVal, args, 6); break;
+                            }
+
                             if (!deviceState.runningConfig.routing) deviceState.runningConfig.routing = { staticRoutes: [] };
-                            deviceState.runningConfig.routing.staticRoutes.push({ destination: args[2], mask: args[3], nextHop: args[4], distance: args[5] ? parseInt(args[5]) : 1 });
+                            deviceState.runningConfig.routing.staticRoutes.push({ destination: args[2], mask: args[3], nextHop: args[4], distance: distance });
                         } else if (args[1] === 'nat') {
                              if (args.length < 9) { appendToTerminal('% Incomplete command.'); break; }
                             if (!deviceState.runningConfig.nat) deviceState.runningConfig.nat = {};
