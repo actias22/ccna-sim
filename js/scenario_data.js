@@ -10,628 +10,83 @@ const scenarios = [
     ],
     tasks: []
   },
+
 // -------------------------------------------------------------
-  // Question 1: VLANとLLDPの設定 (Safe Path版)
+  // 【新】問題①: VLANとLLDPの設定
   // -------------------------------------------------------------
   {
-    id: "question1",
-    title: "Question 1",
-    image: "img/question1.png",
+    id: "new_q1",
+    title: "【新】問題①",
+    image: "img/new_q1.png",
     description: `
       <div class="task-section">
-        <p><strong>状況</strong></p>
-        <p>新しいオフィスネットワークのセットアップを行っています。トポロジー図に従ってVLANを作成し、適切なポートに割り当て、業界標準の近隣探索プロトコルを設定する必要があります。</p>
+        <p><strong>ガイドライン</strong></p>
+        <p>R1には必要なコマンドがすべて事前に設定されています。すべての物理ケーブルが接続され、検証済みです。PC1とPC2はスイッチに接続を確立する必要があり、各ポートは1つのVLANのみを許可する必要があります。</p>
       </div>
     `,
     tasks: [
-      "1. SW-1 を VLAN 35 に設定し、SALES というラベルを付けます",
-      "2. SW-2 を VLAN 39 に設定し、MARKETING というラベルを付けます",
-      "3. PC1 に接続するスイッチポート(Ethernet0/2) を設定します",
-      "4. PC2 に接続するスイッチポート(Ethernet0/3) を設定します",
-      "5. 業界標準プロトコル(LLDP)を使用して、SW-1とSW-2をユニバーサルネイバーディスカバリに設定し、PC1に接続するインターフェース(Ethernet0/2)で無効にします。"
+      "SW-1をVLAN 35に設定し、SALESというラベルを付けます",
+      "SW-2をVLAN 39に設定し、MARKETINGというラベルを付けます",
+      "PC1に接続するスイッチポートを設定します",
+      "PC2に接続するスイッチポートを設定します",
+      "業界標準プロトコルを使用して、SW-1とSW-2をユニバーサルネイバーディスカバリに設定し、PC1に接続するインターフェースで無効にします。"
+    ],
+    // ▼ 練習モード用の解答を追加 ▼
+    answers: [
+`SW-1(config)#vlan 35
+SW-1(config-vlan)#name SALES
+SW-1(config-vlan)#exit`,
+
+`SW-2(config)#vlan 39
+SW-2(config-vlan)#name MARKETING
+SW-2(config-vlan)#exit`,
+
+`SW-1(config)#int e0/2
+SW-1(config-if)#switchport mode access
+SW-1(config-if)#switchport access vlan 35`,
+
+`SW-2(config)#int e0/2
+SW-2(config-if)#switchport mode access
+SW-2(config-if)#switchport access vlan 39`,
+
+`! SW-1とSW-2の両方でLLDPをグローバルに有効化する
+SW-1、SW-2(config)#lldp run
+
+! PC1に接続するインターフェースでLLDPを無効にする
+SW-1(config)#int e0/2
+SW-1(config-if)#no lldp receive
+SW-1(config-if)#no lldp transmit`
     ],
     devices: [
-      { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2", "Ethernet0/3"] },
-      { name: "SW-2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2", "Ethernet0/3"] }
+      { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
+      { name: "SW-2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] }
     ],
     validations: [
-      // --- SW-1 VLAN設定 ---
-      {
-        device: "SW-1",
-        path: "runningConfig", // 常に存在するパスを指定してエラー回避
-        condition: (config) => config && config.vlans && config.vlans['35'],
-        message: "SW-1: VLAN 35 が作成されていません"
-      },
-      {
-        device: "SW-1",
-        path: "runningConfig",
-        condition: (config) => config && config.vlans && config.vlans['35'] && config.vlans['35'].name === 'SALES',
-        message: "SW-1: VLAN 35 の名前が SALES ではありません"
-      },
-      
-      // --- SW-2 VLAN設定 ---
-      {
-        device: "SW-2",
-        path: "runningConfig",
-        condition: (config) => config && config.vlans && config.vlans['39'],
-        message: "SW-2: VLAN 39 が作成されていません"
-      },
-      {
-        device: "SW-2",
-        path: "runningConfig",
-        condition: (config) => config && config.vlans && config.vlans['39'] && config.vlans['39'].name === 'MARKETING',
-        message: "SW-2: VLAN 39 の名前が MARKETING ではありません"
-      },
-
-      // --- SW-1 ポート設定 (PC1 -> e0/2) ---
-      {
-        device: "SW-1",
-        path: "runningConfig",
-        condition: (config) => {
-            const port = config && config.interfaces && config.interfaces['Ethernet0/2'];
-            return port && port.switchport && port.switchport.access_vlan === '35';
-        },
-        message: "SW-1: Ethernet0/2 (PC1接続ポート) が VLAN 35 に割り当てられていません"
-      },
-
-      // --- SW-2 ポート設定 (PC2 -> e0/3) ---
-      {
-        device: "SW-2",
-        path: "runningConfig",
-        condition: (config) => {
-            const port = config && config.interfaces && config.interfaces['Ethernet0/2'];
-            return port && port.switchport && port.switchport.access_vlan === '39';
-        },
-        message: "SW-2: Ethernet0/2 (PC2接続ポート) が VLAN 39 に割り当てられていません"
-      },
-
-      // --- LLDP Global 設定 ---
-      {
-        device: "SW-1",
-        path: "runningConfig",
-        condition: (config) => config && config.lldp && config.lldp.enabled === true,
-        message: "SW-1: LLDPがグローバルで有効になっていません (lldp run)"
-      },
-      {
-        device: "SW-2",
-        path: "runningConfig",
-        condition: (config) => config && config.lldp && config.lldp.enabled === true,
-        message: "SW-2: LLDPがグローバルで有効になっていません (lldp run)"
-      },
-
-      // --- LLDP Interface 設定 (SW-1 e0/2 無効化) ---
-      {
-        device: "SW-1",
-        path: "runningConfig",
-        condition: (config) => {
-            // LLDP設定自体がない場合、またはインターフェース設定がない場合は判定処理をスキップ(不合格)
-            const iface = config && config.lldp && config.lldp.interfaces && config.lldp.interfaces['Ethernet0/2'];
-            // 設定が存在し、かつ transmit/receive が false であること
-            return iface && iface.transmit === false && iface.receive === false;
-        },
-        message: "SW-1: Ethernet0/2 で LLDP の送受信が停止されていません (no lldp transmit / no lldp receive)"
-      }
+      { device: "SW-1", path: "runningConfig.vlans.35.name", expected: "SALES", message: "SW-1: VLAN 35 の名前が SALES ではありません" },
+      { device: "SW-2", path: "runningConfig.vlans.39.name", expected: "MARKETING", message: "SW-2: VLAN 39 の名前が MARKETING ではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "access", message: "SW-1: Ethernet0/2 のモードが access ではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/2.switchport.access_vlan", expected: "35", message: "SW-1: Ethernet0/2 が VLAN 35 に割り当てられていません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "access", message: "SW-2: Ethernet0/2 のモードが access ではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.access_vlan", expected: "39", message: "SW-2: Ethernet0/2 が VLAN 39 に割り当てられていません" },
+      { device: "SW-1", path: "runningConfig.lldp.enabled", expected: true, message: "SW-1: LLDPがグローバルで有効になっていません" },
+      { device: "SW-2", path: "runningConfig.lldp.enabled", expected: true, message: "SW-2: LLDPがグローバルで有効になっていません" },
+      { device: "SW-1", path: "runningConfig.lldp.interfaces.Ethernet0/2.receive", expected: false, message: "SW-1: Ethernet0/2 で lldp receive が無効になっていません" },
+      { device: "SW-1", path: "runningConfig.lldp.interfaces.Ethernet0/2.transmit", expected: false, message: "SW-1: Ethernet0/2 で lldp transmit が無効になっていません" },
+      { device: "SW-1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-1: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "SW-2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-2: 設定が保存されていません (copy run start を実行してください)" }
     ]
   },
 
-// -------------------------------------------------------------
-  // Question 2: セキュリティ設定 (Algorithm Check対応版)
+  // -------------------------------------------------------------
+  // 【新】問題②: VLANとCDPの設定
   // -------------------------------------------------------------
   {
-    id: "question2",
-    title: "Question 2",
-    image: "img/question2.png",
+    id: "new_q2",
+    title: "【新】問題②",
+    image: "img/new_q2.png",
     description: `
       <div class="task-section">
-        <p><strong>状況</strong></p>
-        <p>ネットワークセキュリティを強化するため、ACLによるトラフィック制御、強力な暗号化を用いたユーザー認証、およびDHCPスヌーピングを設定してください。詳細は[Tasks]タブを確認してください。</p>
-      </div>
-    `,
-    tasks: [
-      `タスク1.最小限のACE数を使用して拡張名前付きACLを設定し、トポロジ内に配置して、可能な限り多くのリソースを節約します。ACLの要件は次のとおりです。
-+ ACL名 = WWW_ACL
-+ VLAN 202からのHTTPトラフィックのみを許可
-+ PC1のTelnetのみをブロック
-+ その他すべてのトラフィックを許可`,
-      "タスク2: Sw2 に、仮想ポート0～4のみでTelnetアクセスを許可するローカルアカウントを設定してください。(ユーザー名: AdminGroup, パスワード: BumBL3d, アルゴリズム: Scrypt, 特権レベル: 15)",
-      "タスク3: Sw3 で VLAN 102および202のDHCPスヌーピングを有効にし、さらにMACアドレス検証(verify mac-address)も有効にしてください。"
-    ],
-    devices: [
-      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "Sw1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "Sw2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "Sw3", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] }
-    ],
-    validations: [
-      // --- タスク1: ACL設定 (R1) ---
-      { 
-        device: "R1", 
-        path: "runningConfig.acls.WWW_ACL.type", 
-        expected: "extended", 
-        message: "R1: 拡張ACL 'WWW_ACL' が作成されていません" 
-      },
-      // ACEs
-      {
-        device: "R1",
-        path: "runningConfig.acls.WWW_ACL.entries",
-        condition: (entries) => entries && entries.some(e => e.action === 'permit' && e.raw === 'tcp 10.101.1.0 0.0.0.255 any eq 80'),
-        message: "R1: ルール 'permit tcp 10.101.1.0 0.0.0.255 any eq 80' が設定されていません"
-      },
-      {
-        device: "R1",
-        path: "runningConfig.acls.WWW_ACL.entries",
-        condition: (entries) => entries && entries.some(e => e.action === 'deny' && e.raw === 'tcp any any eq 80'),
-        message: "R1: ルール 'deny tcp any any eq 80' が設定されていません"
-      },
-      {
-        device: "R1",
-        path: "runningConfig.acls.WWW_ACL.entries",
-        condition: (entries) => entries && entries.some(e => e.action === 'deny' && e.raw === 'tcp host 10.101.0.2 any eq 23'),
-        message: "R1: ルール 'deny tcp host 10.101.0.2 any eq 23' が設定されていません"
-      },
-      {
-        device: "R1",
-        path: "runningConfig.acls.WWW_ACL.entries",
-        condition: (entries) => entries && entries.some(e => e.action === 'permit' && e.raw === 'ip any any'),
-        message: "R1: ルール 'permit ip any any' が設定されていません"
-      },
-      // Apply
-      { 
-        device: "R1", 
-        path: "runningConfig.interfaces.Ethernet0/1.accessGroup.in", 
-        expected: "WWW_ACL", 
-        message: "R1: Ethernet0/1 のインバウンド方向に ACL 'WWW_ACL' が適用されていません" 
-      },
-
-      // --- タスク2: ユーザー設定 (Sw2) ---
-      { 
-        device: "Sw2", 
-        path: "runningConfig.security.users.AdminGroup.privilege", 
-        expected: 15, 
-        message: "Sw2: ユーザー AdminGroup の特権レベルが 15 ではありません" 
-      },
-      { 
-        device: "Sw2", 
-        path: "runningConfig.security.users.AdminGroup.password", 
-        expected: "BumBL3d", 
-        message: "Sw2: ユーザー AdminGroup のパスワードが正しくありません" 
-      },
-      { 
-        device: "Sw2", 
-        path: "runningConfig.security.users.AdminGroup.algorithm", 
-        expected: "scrypt", 
-        message: "Sw2: ユーザー AdminGroup のアルゴリズムが Scrypt (algorithm-type scrypt) ではありません" 
-      },
-      // VTY
-      { 
-        device: "Sw2", 
-        path: "runningConfig.lines.vty 0 4.transport.input", 
-        expected: ["telnet"], 
-        message: "Sw2: VTY 0-4 の入力制限が telnet のみになっていません" 
-      },
-      { 
-        device: "Sw2", 
-        path: "runningConfig.lines.vty 0 4.loginMethod", 
-        expected: "local", 
-        message: "Sw2: VTY 0-4 で login local が設定されていません" 
-      },
-
-      // --- タスク3: DHCP Snooping (Sw3) ---
-      { 
-        device: "Sw3", 
-        path: "runningConfig.dhcpSnooping.enabled", 
-        expected: true, 
-        message: "Sw3: DHCPスヌーピングがグローバルで有効になっていません" 
-      },
-      { 
-        device: "Sw3", 
-        path: "runningConfig.dhcpSnooping.vlans", 
-        match: "containsAll", 
-        expected: ["102", "202"], 
-        message: "Sw3: VLAN 102, 202 で DHCPスヌーピングが有効になっていません" 
-      },
-      { 
-        device: "Sw3", 
-        path: "runningConfig.dhcpSnooping.verifyMac", 
-        expected: true, 
-        message: "Sw3: DHCPスヌーピングの MACアドレス検証が有効になっていません" 
-      }
-    ]
-  },
-
-// -------------------------------------------------------------
-  // Question 3: スタティックルーティング (R2, R4追加版)
-  // -------------------------------------------------------------
-  {
-    id: "question3",
-    title: "Question 3",
-    image: "img/question3.png",
-    description: `
-      <div class="task-section">
-        <p><strong>状況</strong></p>
-        <p>ルーター R1 と R3 において、要件に従ってスタティックルートおよびデフォルトルートを設定してください。詳細は[Tasks]タブを確認してください。</p>
-      </div>
-    `,
-    tasks: [
-      "R1がR4のLAN上のPC1のみに到達する際、R2経由の経路を優先するよう静的ルーティングを設定する",
-      "プライマリ経路に障害が発生した場合、R1発のトラフィックがR3経由の代替経路でPC1に到達するよう静的ルーティングを設定する",
-      "R1とR3に、最小ホップ数でインターネットへ接続するデフォルトルートを設定する"
-    ],
-    devices: [
-      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R3", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R4", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
-    ],
-    validations: [
-      // タスク1: R1 -> 10.0.41.10/32 via 10.0.12.2
-      {
-        device: "R1",
-        path: "runningConfig.routing.staticRoutes",
-        match: "contains",
-        expected: { destination: "10.0.41.10", mask: "255.255.255.255", nextHop: "10.0.12.2" },
-        message: "R1: PC1への優先経路 (via 10.0.12.2) が設定されていません"
-      },
-      // タスク2: R1 -> 10.0.41.10/32 via 10.0.13.3 AD 2
-      {
-        device: "R1",
-        path: "runningConfig.routing.staticRoutes",
-        match: "contains",
-        expected: { destination: "10.0.41.10", mask: "255.255.255.255", nextHop: "10.0.13.3", distance: 2 },
-        message: "R1: PC1への代替経路 (via 10.0.13.3, AD 2) が設定されていません"
-      },
-      // タスク3 (R1): Default Route via 10.0.13.3
-      {
-        device: "R1",
-        path: "runningConfig.routing.staticRoutes",
-        match: "contains",
-        expected: { destination: "0.0.0.0", mask: "0.0.0.0", nextHop: "10.0.13.3" },
-        message: "R1: デフォルトルート (via 10.0.13.3) が設定されていません"
-      },
-      // タスク3 (R3): Default Route via 209.165.201.1
-      {
-        device: "R3",
-        path: "runningConfig.routing.staticRoutes",
-        match: "contains",
-        expected: { destination: "0.0.0.0", mask: "0.0.0.0", nextHop: "209.165.201.1" },
-        message: "R3: デフォルトルート (via 209.165.201.1) が設定されていません"
-      }
-    ]
-  },
-
-// -------------------------------------------------------------
-  // Question 4: IPサービス設定 (R1, R3追加版)
-  // -------------------------------------------------------------
-  {
-    id: "question4",
-    title: "Question 4",
-    image: "img/question4.png",
-    description: `
-      <div class="task-section">
-        <p><strong>状況</strong></p>
-        <p>デバイス間の接続は確立されており、実装を完了するにはIPサービスを設定する必要があります。ルータR2にはNATとDHCPの部分的な設定が施されています。</p>
-      </div>
-    `,
-    tasks: [
-      `タスク1
-ルータR2はIPアドレス10.0.12.1に対してポートアドレス変換（PAT）が部分的に設定されています。
-+ PATを設定し、10.0.12.1がEthernet0/0のIPアドレスをパブリックルーティング可能IPとして使用するようにする。
-+ SW1から209.165.200.224へのpingを使用して、R2での変換が成功していることを確認する。`,
-      
-      `タスク2
-R2に設定されたNTPサーバーを使用して、SW1にNTPクライアントを設定する。
-– ntp broadcast client または ntp broadcast コマンドは使用しないこと。`,
-      
-      `タスク 3
-– SW1にDHCPリレーエージェントを設定する。`,
-      
-      `タスク 4
-SW1のVTYライン0から4にSSHサーバーを設定する。
-– SSHバージョン2を使用する`
-    ],
-    devices: [
-      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R3", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
-    ],
-    validations: [
-      // --- タスク1: R2 PAT設定 ---
-      {
-        device: "R2",
-        path: "runningConfig.nat.insideSourceList",
-        expected: "1",
-        message: "R2: NATのソースリストが 1 ではありません"
-      },
-      {
-        device: "R2",
-        path: "runningConfig.nat.interfaceOverload",
-        expected: "Ethernet0/0",
-        message: "R2: NATのオーバーロードインターフェースが Ethernet0/0 ではありません"
-      },
-
-      // --- タスク2: SW1 NTP設定 ---
-      {
-        device: "SW-1",
-        path: "runningConfig.ntp.server",
-        expected: "10.0.12.2",
-        message: "SW-1: NTPサーバーが 10.0.12.2 に設定されていません"
-      },
-
-      // --- タスク3: SW1 DHCPリレー設定 ---
-      {
-        device: "SW-1",
-        path: "runningConfig.interfaces.Vlan101.ipHelper",
-        expected: "10.0.12.2",
-        message: "SW-1: VLAN 101 に helper-address 10.0.12.2 が設定されていません"
-      },
-
-      // --- タスク4: SW1 SSH設定 ---
-      {
-        device: "SW-1",
-        path: "runningConfig.security.sshVersion",
-        expected: 2,
-        message: "SW-1: SSHのバージョンが 2 に設定されていません"
-      },
-      {
-        device: "SW-1",
-        path: "runningConfig.lines.vty 0 4.transport.input",
-        expected: ["ssh"],
-        message: "SW-1: VTY 0-4 の入力制限が ssh ではありません"
-      },
-      {
-        device: "SW-1",
-        path: "runningConfig.lines.vty 0 4.loginMethod",
-        expected: "local",
-        message: "SW-1: VTY 0-4 で login local が設定されていません"
-      }
-    ]
-  },
-
-// -------------------------------------------------------------
-  // Question 5: スタティックルーティング (障害試験判定付き)
-  // -------------------------------------------------------------
-  {
-    id: "question5",
-    title: "Question 5",
-    image: "img/question5.png",
-    description: `
-      <div class="task-section">
-        <p><strong>状況</strong></p>
-        <p>複雑なネットワーク環境において、以下のルーティング要件に従って各ルーターを設定し、接続性を確認してください。詳細は[Tasks]タブを確認してください。</p>
-      </div>
-    `,
-    tasks: [
-      `タスク1
-+ R5 に宛先 10.200.220.6 へのホストルートを設定する。
-+ R1に静的デフォルトルートを設定し、R3経由でR6に向かう経路を優先させる。
-+ R5からtracerouteとpingを使用し、R6への経路と到達可能性を確認する。`,
-
-      `タスク2
-+ R1にフローティング静的デフォルトルートを設定し、R3へのリンクが障害発生時にR2経由でR6に向かう経路を優先させる。
-+ 225の管理距離を設定する。
-+ R2に静的ルートを設定し、10.100.110.0/25への返信トラフィックを転送する。
-+ R1のインターフェースe0/1をシャットダウン後、R5からtracerouteとpingを使用してR6への経路と到達可能性を確認する。`
-    ],
-    devices: [
-      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
-      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R5", type: "router", physicalPorts: ["Ethernet0/0"] }
-    ],
-    validations: [
-      // --- タスク1: 基本ルーティング設定 ---
-      // R5: ip route 10.200.220.6 ...
-      {
-        device: "R5",
-        path: "runningConfig.routing.staticRoutes",
-        match: "contains",
-        expected: { destination: "10.200.220.6", mask: "255.255.255.255", nextHop: "10.100.110.1" },
-        message: "R5: 宛先 10.200.220.6 へのホストルートが正しく設定されていません"
-      },
-      // R1: Default Route via R3 (10.133.13.3)
-      {
-        device: "R1",
-        path: "runningConfig.routing.staticRoutes",
-        match: "contains",
-        expected: { destination: "0.0.0.0", mask: "0.0.0.0", nextHop: "10.133.13.3" },
-        message: "R1: R3経由(10.133.13.3)のデフォルトルートが設定されていません"
-      },
-
-      // --- タスク2: 冗長化設定 ---
-      // R2: Return Route
-      {
-        device: "R2",
-        path: "runningConfig.routing.staticRoutes",
-        match: "contains",
-        expected: { destination: "10.100.110.0", mask: "255.255.255.128", nextHop: "10.122.12.1" },
-        message: "R2: 10.100.110.0/25 への返信ルートが設定されていません"
-      },
-      // R1: Floating Static Route via R2 (AD 225)
-      {
-        device: "R1",
-        path: "runningConfig.routing.staticRoutes",
-        match: "contains",
-        expected: { destination: "0.0.0.0", mask: "0.0.0.0", nextHop: "10.122.12.2", distance: 225 },
-        message: "R1: R2経由(10.122.12.2)のフローティングスタティックルート(AD 225)が設定されていません"
-      },
-
-      // --- タスク2: 障害試験と確認 ---
-      // 1. R1のインターフェースシャットダウン確認
-      {
-        device: "R1",
-        path: "runningConfig.interfaces.Ethernet0/1.status",
-        expected: "shutdown",
-        message: "R1: テストのためにインターフェース Ethernet0/1 をシャットダウンしていません"
-      },
-      // 2. R5からのPing実行確認 (10.200.220.6宛て)
-      {
-        device: "R5",
-        path: "runningConfig.logs",
-        condition: (logs) => logs && logs.some(l => l.command === 'ping' && l.target === '10.200.220.6'),
-        message: "R5: R6 (10.200.220.6) への Ping による到達確認が行われていません"
-      },
-      // 3. R5からのTraceroute実行確認 (10.200.220.6宛て)
-      {
-        device: "R5",
-        path: "runningConfig.logs",
-        condition: (logs) => logs && logs.some(l => l.command === 'traceroute' && l.target === '10.200.220.6'),
-        message: "R5: R6 (10.200.220.6) への Traceroute による経路確認が行われていません"
-      }
-    ]
-  },
-
-// -------------------------------------------------------------
-  // Question 6: セキュリティ設定 (ユーザー, NACL, PortSecurity)
-  // -------------------------------------------------------------
-  {
-    id: "question6",
-    title: "Question 6",
-    image: "img/question6.png",
-    description: `
-      <div class="task-section">
-        <p><strong>状況</strong></p>
-        <p>トポロジーを参照してください。すべての物理ケーブル配線は完了しています。ローカルユーザーアカウント、名前付きアクセス制御リスト（NACL）、およびセキュリティを設定してください。</p>
-      </div>
-    `,
-    tasks: [
-      `タスク1. Sw101 にローカルアカウントを設定し、仮想ポート 0-4 でのみ telnet アクセスを許可する。
-以下の情報を使用する：
-+ ユーザー名: support
-+ パスワード: max2learn
-+ 特権レベル: Exec モード`,
-
-      `タスク2. Sw101 に単一の NACL を設定し適用する。以下の内容を使用する：
-+ 名前: ENT_ACL
-+ VLAN 200上のPC2からPC1へpingを拒否する
-+ VLAN 200上のPC2のみがSw101へtelnet接続できるように許可
-+ VLAN 200からのその他すべてのデバイスによるtelnet接続を禁止
-+ VLAN 200からのその他すべてのネットワークトラフィックを許可`,
-
-      `タスク3. Sw102のインターフェイスEthernet 0/0にセキュリティを設定:
-+ セキュアMACアドレスの最大数を4に設定する。
-+ セキュアMACアドレス数が設定最大値を下回るまで、送信元アドレス不明のパケットを破棄する。通知アクションは不要。
-+ セキュアMACアドレスの動的学習を許可する。`
-    ],
-    devices: [
-      { name: "Sw101", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "Sw102", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
-    ],
-    validations: [
-      // --- タスク1: Sw101 User & VTY ---
-      // username support privilege 15 secret max2learn
-      {
-        device: "Sw101",
-        path: "runningConfig.security.users.support.privilege",
-        expected: 15,
-        message: "Sw101: ユーザー support の特権レベルが 15 (Exec) ではありません"
-      },
-      {
-        device: "Sw101",
-        path: "runningConfig.security.users.support.password",
-        expected: "max2learn",
-        message: "Sw101: ユーザー support のパスワードが正しくありません"
-      },
-      // line vty 0 4 -> transport input telnet
-      {
-        device: "Sw101",
-        path: "runningConfig.lines.vty 0 4.transport.input",
-        expected: ["telnet"],
-        message: "Sw101: VTY 0-4 の入力制限が telnet のみになっていません"
-      },
-      // login local
-      {
-        device: "Sw101",
-        path: "runningConfig.lines.vty 0 4.loginMethod",
-        expected: "local",
-        message: "Sw101: VTY 0-4 でローカル認証 (login local) が設定されていません"
-      },
-
-      // --- タスク2: Sw101 NACL (ENT_ACL) ---
-      // ip access-list extended ENT_ACL
-      {
-        device: "Sw101",
-        path: "runningConfig.acls.ENT_ACL.type",
-        expected: "extended",
-        message: "Sw101: 拡張ACL 'ENT_ACL' が作成されていません"
-      },
-      // deny icmp host 192.168.200.10 host 192.168.100.10
-      {
-        device: "Sw101",
-        path: "runningConfig.acls.ENT_ACL.entries",
-        condition: (entries) => entries && entries.some(e => e.action === 'deny' && e.raw === 'icmp host 192.168.200.10 host 192.168.100.10'),
-        message: "Sw101: ルール 'deny icmp host 192.168.200.10 host 192.168.100.10' が設定されていません"
-      },
-      // permit tcp host 192.168.200.10 host 192.168.100.1 eq telnet
-      {
-        device: "Sw101",
-        path: "runningConfig.acls.ENT_ACL.entries",
-        condition: (entries) => entries && entries.some(e => e.action === 'permit' && e.raw === 'tcp host 192.168.200.10 host 192.168.100.1 eq telnet'),
-        message: "Sw101: ルール 'permit tcp host 192.168.200.10 host 192.168.100.1 eq telnet' が設定されていません"
-      },
-      // deny tcp 192.168.200.0 0.0.0.255 any eq telnet
-      {
-        device: "Sw101",
-        path: "runningConfig.acls.ENT_ACL.entries",
-        condition: (entries) => entries && entries.some(e => e.action === 'deny' && e.raw === 'tcp 192.168.200.0 0.0.0.255 any eq telnet'),
-        message: "Sw101: ルール 'deny tcp 192.168.200.0 0.0.0.255 any eq telnet' が設定されていません"
-      },
-      // permit ip 192.168.200.0 0.0.0.255 any
-      {
-        device: "Sw101",
-        path: "runningConfig.acls.ENT_ACL.entries",
-        condition: (entries) => entries && entries.some(e => e.action === 'permit' && e.raw === 'ip 192.168.200.0 0.0.0.255 any'),
-        message: "Sw101: ルール 'permit ip 192.168.200.0 0.0.0.255 any' が設定されていません"
-      },
-      // Apply: int vlan 100 -> ip access-group ENT_ACL out
-      {
-        device: "Sw101",
-        path: "runningConfig.interfaces.Vlan100.accessGroup.out",
-        expected: "ENT_ACL",
-        message: "Sw101: VLAN 100 のアウトバウンド方向に ACL 'ENT_ACL' が適用されていません"
-      },
-
-      // --- タスク3: Sw102 Port Security ---
-      // switchport port-security
-      {
-        device: "Sw102",
-        path: "runningConfig.interfaces.Ethernet0/0.portSecurity.enabled",
-        expected: true,
-        message: "Sw102: Ethernet0/0 でポートセキュリティが有効化されていません"
-      },
-      // switchport port-security maximum 4
-      {
-        device: "Sw102",
-        path: "runningConfig.interfaces.Ethernet0/0.portSecurity.maximum",
-        expected: 4,
-        message: "Sw102: 最大MACアドレス数が 4 ではありません"
-      },
-      // switchport port-security violation protect
-      {
-        device: "Sw102",
-        path: "runningConfig.interfaces.Ethernet0/0.portSecurity.violation",
-        expected: "protect",
-        message: "Sw102: 違反モードが protect ではありません"
-      },
-      // switchport port-security mac-address sticky
-      {
-        device: "Sw102",
-        path: "runningConfig.interfaces.Ethernet0/0.portSecurity.stickyMac",
-        expected: true,
-        message: "Sw102: sticky (動的学習) 設定が無効です"
-      }
-    ]
-  },
-
-// -------------------------------------------------------------
-  // Question 7: VLANとCDPの設定
-  // -------------------------------------------------------------
-  {
-    id: "question7",
-    title: "Question 7",
-    image: "img/question7.png",
-    description: `
-      <div class="task-section">
-        <p><strong>状況</strong></p>
+        <p><strong>ガイドライン</strong></p>
         <p>R1には必要なコマンドがすべて事前に設定されています。すべての物理ケーブルが接続され、検証済みです。PC1、PC3、およびサーバーからスイッチへの接続を確立し、各ポートで1つのVLANのみを許可する必要があります。</p>
       </div>
     `,
@@ -641,149 +96,490 @@ SW1のVTYライン0から4にSSHサーバーを設定する。
       "PC3に接続するスイッチポートを設定します",
       "R1がCisco独自の近隣探索プロトコルを使用してSW-1を検出し、ネットワーク上の他のすべてのデバイスがSW-1を検出できないことを確認します。"
     ],
+    // ▼ 練習モード用の解答を追加 ▼
+    answers: [
+`SW-2(config)#vlan 30
+SW-2(config-vlan)#name SALES
+SW-2(config-vlan)#exit`,
+
+`SW-2(config)#int e0/2
+SW-2(config-if)#switchport mode access
+SW-2(config-if)#switchport access vlan 20`,
+
+`SW-2(config-if)#int e0/3
+SW-2(config-if)#switchport mode access
+SW-2(config-if)#switchport access vlan 30`,
+
+`SW-1(config)#cdp run
+SW-1(config)#int e0/0
+SW-1(config-if)#cdp enable
+SW-1(config-if)#exit
+SW-1(config)#int range e0/1 - 2
+SW-1(config-if-range)#no cdp enable`
+    ],
     devices: [
       { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
-      { name: "SW-2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2", "Ethernet0/3"] },
-      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+      { name: "SW-2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2", "Ethernet0/3"] }
     ],
     validations: [
-      // --- タスク1 (Sw-2): VLAN 30 Name SALES ---
-      { 
-        device: "SW-2", 
-        path: "runningConfig.vlans.30.name", 
-        expected: "SALES", 
-        message: "SW-2: VLAN 30 の名前が 'SALES' に設定されていません" 
-      },
+      { device: "SW-2", path: "runningConfig.vlans.30.name", expected: "SALES", message: "SW-2: VLAN 30 の名前が SALES ではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "access", message: "SW-2: Ethernet0/2 (Server1) が access モードではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.access_vlan", expected: "20", message: "SW-2: Ethernet0/2 が VLAN 20 に設定されていません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/3.switchport.mode", expected: "access", message: "SW-2: Ethernet0/3 (PC3) が access モードではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/3.switchport.access_vlan", expected: "30", message: "SW-2: Ethernet0/3 が VLAN 30 に設定されていません" },
+      { device: "SW-1", path: "runningConfig.cdp.enabled", expected: true, message: "SW-1: CDPがグローバルで有効になっていません" },
+      { device: "SW-1", path: "runningConfig.cdp.interfaces.Ethernet0/0", condition: (val) => val !== false, message: "SW-1: Ethernet0/0 で CDP が有効になっていません" },
+      { device: "SW-1", path: "runningConfig.cdp.interfaces.Ethernet0/1", expected: false, message: "SW-1: Ethernet0/1 で CDP が無効になっていません" },
+      { device: "SW-1", path: "runningConfig.cdp.interfaces.Ethernet0/2", expected: false, message: "SW-1: Ethernet0/2 で CDP が無効になっていません" },
+      { device: "SW-1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-1: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "SW-2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-2: 設定が保存されていません (copy run start を実行してください)" }
+    ]
+  },
+
+  // -------------------------------------------------------------
+  // 【新】問題③: OSPF ネットワークアドバタイズ
+  // -------------------------------------------------------------
+  {
+    id: "new_q3",
+    title: "【新】問題③",
+    image: "img/new_q3.png",
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>※設定できるのはR2のみです。</p>
+      </div>
+    `,
+    tasks: [
+      "R2でOSPFを設定し、R1 と R2 がネイバーになることを確認します。<br>・プロセス ID として 10 を使用<br>・ルーター ID として L0のIP を使用<br>・R1がR2およびR3とのネイバー隣接関係を確立するように設定してください。使用されているプレフィックスと完全に一致するように接続されたネットワークをアドバタイズします。",
+      "R2が常にエリア0のDRになるように設定してください。"
+    ],
+    // ▼ 練習モード用の解答と解説を追加 ▼
+    answers: [
+`R2(config)#router ospf 10
+R2(config-router)#router-id 10.2.2.2
+R2(config-router)#network 10.2.2.2 0.0.0.0 area 0
+R2(config-router)#network 10.0.12.0 0.0.0.3 area 0
+R2(config-router)#network 10.0.23.0 0.0.0.15 area 0`,
+
+`R2(config)#interface range e0/0 - 1
+R2(config-if-range)#ip ospf priority 255
+R2(config-if-range)#end
+R2#clear ip ospf process
+
+【解説】
+ip ospf priority 255を設定する理由は、対象のルータ（今回の場合はR2）をOSPFのDR（代表ルータ）に確実に選出させるためです。
+OSPFのDR/BDR選出プロセスでは、インターフェースのプライオリティ値（0〜255、デフォルトは1）が最も高いルータが優先的にDRとして選ばれます。そのため、設定できる最高値である「255」を明示的に割り当てることで、他のルータのルータIDの大小に関係なく、R2が常にDRになるようにしています。
+
+clear ip ospf processコマンドを実行する理由は代表ルータの選出を再度行うためです。
+clear ip ospf processコマンドは実行した際にyes/noを入力する必要があります。
+
+R2# clear ip ospf process
+Reset ALL OSPF processes? [no]: yes　←このyesを入力してEnter
+OSPF processes reset`
+    ],
+    devices: [
+      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+    ],
+    validations: [
+      { device: "R2", path: "runningConfig", condition: (config) => config?.routing?.ospf?.['10']?.routerId === '10.2.2.2', message: "R2: OSPF 10 のルーターIDが 10.2.2.2 に設定されていません" },
+      { device: "R2", path: "runningConfig", condition: (config) => { const nets = config?.routing?.ospf?.['10']?.networks; return nets && nets.some(n => n.ip === '10.2.2.2' && n.wildcard === '0.0.0.0' && n.area === '0'); }, message: "R2: network 10.2.2.2 0.0.0.0 area 0 が設定されていません" },
+      { device: "R2", path: "runningConfig", condition: (config) => { const nets = config?.routing?.ospf?.['10']?.networks; return nets && nets.some(n => n.ip === '10.0.12.0' && n.wildcard === '0.0.0.3' && n.area === '0'); }, message: "R2: network 10.0.12.0 0.0.0.3 area 0 が設定されていません" },
+      { device: "R2", path: "runningConfig", condition: (config) => { const nets = config?.routing?.ospf?.['10']?.networks; return nets && nets.some(n => n.ip === '10.0.23.0' && n.wildcard === '0.0.0.15' && n.area === '0'); }, message: "R2: network 10.0.23.0 0.0.0.15 area 0 が設定されていません" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.ospf.priority", expected: 255, message: "R2: Ethernet0/0 の OSPF priority が 255 に設定されていません" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/1.ospf.priority", expected: 255, message: "R2: Ethernet0/1 の OSPF priority が 255 に設定されていません" },
+      { device: "R2", path: "runningConfig.logs", condition: (logs) => logs && logs.some(l => l.command === 'clear' && l.target === 'ip ospf process'), message: "R2: OSPFプロセスのクリアが実行されていません" },
+      { device: "R2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R2: 設定が保存されていません (copy run start を実行してください)" }
+    ]
+  },
+
+  // -------------------------------------------------------------
+  // 【新】問題④: IPv4 & IPv6 アドレス設定
+  // -------------------------------------------------------------
+  {
+    id: "new_q4",
+    title: "【新】問題④",
+    image: "img/new_q4.png",
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>指定されたサブネットを使用して、R1およびR2のインターフェースに適切なIPアドレスを設定してください。</p>
+      </div>
+    `,
+    tasks: [
+      "R1に、ipv4 ネットワークで使用可能な最初のホスト IP アドレスを設定します。<br>R2に、IPv4 ネットワークで使用可能な最後のホスト IP アドレスを設定します。",
+      "R1 にIPv6 ネットワークで使用可能な最初のホスト IP アドレスを設定します。<br>R2 にIPv6 ネットワークで使用可能な最後のホスト IP アドレスを設定します。"
+    ],
+    // ▼ 練習モード用の解答と解説を追加 ▼
+    answers: [
+`R1(config)#interface e0/0
+R1(config-if)#ip address 10.0.12.5 255.255.255.252
+R1(config-if)#no shut
+
+R2(config)#interface e0/0
+R2(config-if)#ip address 10.0.12.6 255.255.255.252
+R2(config-if)#no shut`,
+
+`R1(config)#interface e0/0
+R1(config-if)#ipv6 address 2001:db8:12::1/126
+
+R2(config)#interface e0/0
+R2(config-if)#ipv6 address 2001:db8:12::3/126
+
+【解説】IPv6アドレス（/126）の計算方法
+プレフィックス長 /126 のIPv6ネットワークから、割り当て可能な「最初」と「最後」のホストIPアドレスを算出する手順は下記となります。
+
+1. ホスト部のビット数を確認する
+IPv6アドレスの全体は128ビットです。今回指定されているネットワークのプレフィックス長は /126 のため、128から126を引いた残りのビット数がホスト部となります。
+128ビット - 126ビット = 2ビット
+
+2.サブネット内のアドレス範囲を割り出す
+ホスト部が2ビットの場合、作ることができるアドレスのパターンは 2の2乗 で合計 4個 となります。
+指定されたサブネット 2001:db8:12::/126 における末尾の4パターンは以下の通りです。
+2001:db8:12::0 （Anycast用アドレス等として予約済のため使用不可）
+2001:db8:12::1 （最初に使用可能なホストIP）
+2001:db8:12::2
+2001:db8:12::3 （最後に使用可能なホストIP　※IPv6にはブロードキャストアドレスがありません）
+
+3.各機器にアドレスを割り当てる
+タスクの要件に合わせて、算出したアドレスをR1とR2にそれぞれ設定します。
+R1（最初のホストIP）： 2001:db8:12::1/126
+R2（最後のホストIP）： 2001:db8:12::3/126`
+    ],
+    devices: [
+      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0"] },
+      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0"] }
+    ],
+    validations: [
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ip", expected: "10.0.12.5", message: "R1: IPv4アドレスが 10.0.12.5 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.mask", expected: "255.255.255.252", message: "R1: IPv4サブネットマスクが 255.255.255.252 ではありません" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.ip", expected: "10.0.12.6", message: "R2: IPv4アドレスが 10.0.12.6 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ipv6", expected: "2001:db8:12::1/126", message: "R1: IPv6アドレスが 2001:db8:12::1/126 に設定されていません" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.ipv6", expected: "2001:db8:12::3/126", message: "R2: IPv6アドレスが 2001:db8:12::3/126 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.status", expected: "up", message: "R1: インターフェースが起動していません (no shut)" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.status", expected: "up", message: "R2: インターフェースが起動していません (no shut)" },
+      { device: "R1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R1: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "R2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R2: 設定が保存されていません (copy run start を実行してください)" }
+    ]
+  },
+
+  // -------------------------------------------------------------
+  // 【新】問題⑤: トランクとEtherChannel (LACP)
+  // -------------------------------------------------------------
+  {
+    id: "new_q5",
+    title: "【新】問題⑤",
+    image: "img/new_q5.png",
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>設定できるのはSW1とSW2のみです。</p>
+      </div>
+    `,
+    tasks: [
+      "IEEE 標準フレームタグ付け方式を使用して、ポートEO/0とE0/1 上でSW1 と SW2間のトランクを設定します。<br>またVLAN1,11,12のみが通信出来るように設定します",
+      "vlan12のみを許可するようにSW1のe0/2を設定します",
+      "Sw1とSw2でLACPを設定します。<br>E0/0とEO/1を単一の論理リンクに統合し、トランク構成はそのまま維持します。<br>リンクに番号12を割り当てます。<br>両方のリンクでネゴシエーションを行う必要があります。"
+    ],
+    // ▼ 練習モード用の解答を追加 ▼
+    answers: [
+`Sw1,Sw2(config)#interface range e0/0 - 1
+Sw1,Sw2(config-if-range)#switchport trunk encapsulation dot1q
+Sw1,Sw2(config-if-range)#switchport mode trunk
+Sw1,Sw2(config-if-range)#switchport trunk allowed vlan 1,11,12`,
+
+`Sw1(config)#interface e0/2
+Sw1(config-if)#switchport trunk encapsulation dot1q
+Sw1(config-if)#switchport mode trunk
+Sw1(config-if)#switchport trunk allowed vlan 12`,
+
+`Sw1,Sw2(config)#interface range e0/0 - 1
+Sw1,Sw2(config-if-range)#channel-group 12 mode active`
+    ],
+    devices: [
+      { name: "Sw1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
+      { name: "Sw2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+    ],
+    validations: [
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "Sw1: E0/0 のトランクカプセル化が dot1q ではありません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.switchport.mode", expected: "trunk", message: "Sw1: E0/0 が trunk モードではありません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.switchport.allowed_vlans", match: "containsAll", expected: ["1", "11", "12"], message: "Sw1: E0/0 で VLAN 1, 11, 12 が許可されていません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.id", expected: "12", message: "Sw1: E0/0 が channel-group 12 に設定されていません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.mode", expected: "active", message: "Sw1: E0/0 の LACPモード が active ではありません" },
       
-      // --- タスク2 (Sw-2): Server1 Port (e0/2) -> VLAN 20 ---
-      { 
-        device: "SW-2", 
-        path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", 
-        expected: "access", 
-        message: "SW-2: Ethernet0/2 (Server1) のモードが access ではありません" 
-      },
-      { 
-        device: "SW-2", 
-        path: "runningConfig.interfaces.Ethernet0/2.switchport.access_vlan", 
-        expected: "20", 
-        message: "SW-2: Ethernet0/2 (Server1) の VLAN が 20 に設定されていません" 
-      },
-
-      // --- タスク3 (Sw-2): PC3 Port (e0/3) -> VLAN 30 ---
-      { 
-        device: "SW-2", 
-        path: "runningConfig.interfaces.Ethernet0/3.switchport.mode", 
-        expected: "access", 
-        message: "SW-2: Ethernet0/3 (PC3) のモードが access ではありません" 
-      },
-      { 
-        device: "SW-2", 
-        path: "runningConfig.interfaces.Ethernet0/3.switchport.access_vlan", 
-        expected: "30", 
-        message: "SW-2: Ethernet0/3 (PC3) の VLAN が 30 に設定されていません" 
-      },
-
-      // --- タスク4 (Sw-1): CDP Configuration ---
-      { 
-        device: "SW-1", 
-        path: "runningConfig.cdp.enabled", 
-        expected: true, 
-        message: "SW-1: CDP がグローバルで有効化されていません (cdp run)" 
-      },
-      { 
-        device: "SW-1", 
-        path: "runningConfig.cdp.interfaces.Ethernet0/0", 
-        condition: (val) => val !== false, 
-        message: "SW-1: Ethernet0/0 で CDP が有効になっていません" 
-      },
-      { 
-        device: "SW-1", 
-        path: "runningConfig.cdp.interfaces.Ethernet0/1", 
-        expected: false, 
-        message: "SW-1: Ethernet0/1 で CDP が無効化されていません (no cdp enable)" 
-      },
-      { 
-        device: "SW-1", 
-        path: "runningConfig.cdp.interfaces.Ethernet0/2", 
-        expected: false, 
-        message: "SW-1: Ethernet0/2 で CDP が無効化されていません (no cdp enable)" 
-      }
+      { device: "Sw2", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "Sw2: E0/0 のトランクカプセル化が dot1q ではありません" },
+      { device: "Sw2", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.mode", expected: "active", message: "Sw2: E0/0 の LACPモード が active ではありません" },
+      
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/2.switchport.encapsulation", expected: "dot1q", message: "Sw1: E0/2 のトランクカプセル化が dot1q ではありません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "trunk", message: "Sw1: E0/2 が trunk モードではありません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/2.switchport.allowed_vlans", match: "contains", expected: "12", message: "Sw1: E0/2 で VLAN 12 が許可されていません" },
+      
+      { device: "Sw1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "Sw1: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "Sw2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "Sw2: 設定が保存されていません (copy run start を実行してください)" }
     ]
   },
 
 // -------------------------------------------------------------
-  // Question 8: OSPFの設定
+  // 【新】問題6: Voice VLAN と LLDP
   // -------------------------------------------------------------
   {
-    id: "question8",
-    title: "Question 8",
-    image: "img/ospf_topology.png",
+    id: "new_q6",
+    title: "【新】問題⑥",
+    image: "img/new_q6.png",
     description: `
       <div class="task-section">
-        <p><strong>状況</strong></p>
-        <p>トポロジー図を参照してください。すべての物理ケーブルは正しく接続されています。ルーター2と3にはアクセスできません。ネットワークのOSPFルーティングを設定し、ネットワークステートメントを使用せずにR1がエリア0に参加していることを確認してください。</p>
+        <p><strong>ガイドライン</strong></p>
+        <p>物理的なケーブル配線はすべて完了し、検証済みです。スイッチのE0/1、E0/2、E0/3ポートの接続は、音声およびデータ通信機能に対応できるよう設定され、利用可能である必要があります。</p>
       </div>
     `,
     tasks: [
-      `タスク 1.
-R1 上でOSPF をプロセス ID とルーターIDのみを使用して以下のように設定します。
-- プロセス IDとして33を使用
-- ルーターIDとしてE0/1 IP (10.0.33.1) を使用`,
+      "Sw1とSw2の両方にVLANを設定し、トポロジーで指定されたVLAN名に従って名前を付けます。",
+      "両方のスイッチのE0/1、E0/2、およびE0/3ポートを両方のVLAN用に設定し、Cisco IP電話とPCがトラフィックを通過できるようにします。",
+      "e0/0 上でベンダーニュートラルプロトコルを介してネイバー検出を許可するように Sw1とSw2 を設定します。"
+    ],
+    // ▼ 練習モード用の解答を追加 ▼
+    answers: [
+`Sw1,Sw2(config)# vlan 77
+Sw1,Sw2(config-vlan)# name User_VLAN
+Sw1,Sw2(config-vlan)# exit
+Sw1,Sw2(config)# vlan 177
+Sw1,Sw2(config-vlan)# name Voice_VLAN
+Sw1,Sw2(config-vlan)# exit`,
 
-      `タスク 2.
-- R1 が R2 およびR3とのネイバー隣接関係を確立するように設定します。OSPF プロセスの network ステートメントは使用しないでください。
-- R1 が常にエリア0のDRになるように設定します。
-- OSPFプロセスをクリアして再選出を促します。`
+`Sw1,Sw2(config)# int range e0/1 - 3
+Sw1,Sw2(config-if-range)# switchport mode access
+Sw1,Sw2(config-if-range)# switchport access vlan 77
+Sw1,Sw2(config-if-range)# switchport voice vlan 177`,
+
+`Sw1,Sw2(config)# lldp run
+Sw1,Sw2(config)# int e0/0
+Sw1,Sw2(config-if)# lldp transmit
+Sw1,Sw2(config-if)# lldp receive`
     ],
     devices: [
-      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
-      { name: "R3", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+      { name: "Sw1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2", "Ethernet0/3"] },
+      { name: "Sw2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2", "Ethernet0/3"] }
     ],
     validations: [
-      // --- タスク1: OSPF Process 33 & Router ID ---
-      {
-        device: "R1",
-        path: "runningConfig.routing.ospf.33.routerId",
-        expected: "10.0.33.1",
-        message: "R1: OSPFプロセス 33 の router-id が 10.0.33.1 に設定されていません"
-      },
+      { device: "Sw1", path: "runningConfig.vlans.77.name", expected: "User_VLAN", message: "Sw1: VLAN 77 の名前が 'User_VLAN' ではありません" },
+      { device: "Sw1", path: "runningConfig.vlans.177.name", expected: "Voice_VLAN", message: "Sw1: VLAN 177 の名前が 'Voice_VLAN' ではありません" },
+      { device: "Sw2", path: "runningConfig.vlans.77.name", expected: "User_VLAN", message: "Sw2: VLAN 77 の名前が 'User_VLAN' ではありません" },
+      { device: "Sw2", path: "runningConfig.vlans.177.name", expected: "Voice_VLAN", message: "Sw2: VLAN 177 の名前が 'Voice_VLAN' ではありません" },
       
-      // --- タスク2: Interface E0/0 OSPF Config ---
-      {
-        device: "R1",
-        path: "runningConfig.interfaces.Ethernet0/0.ospf.area",
-        expected: "0",
-        message: "R1: Ethernet0/0 が OSPF プロセス 33 の エリア 0 に参加していません (ip ospf 33 area 0)"
-      },
-      {
-        device: "R1",
-        path: "runningConfig.interfaces.Ethernet0/0.ospf.priority",
-        expected: 255,
-        message: "R1: Ethernet0/0 の OSPF priority が 255 に設定されていません"
-      },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "access", message: "Sw1: E0/1 が access モードではありません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/1.switchport.access_vlan", expected: "77", message: "Sw1: E0/1 に Data VLAN 77 が設定されていません" },
+      { device: "Sw1", path: "runningConfig.interfaces.Ethernet0/1.switchport.voice_vlan", expected: "177", message: "Sw1: E0/1 に Voice VLAN 177 が設定されていません" },
       
-      // --- タスク2: Interface E0/1 OSPF Config ---
-      {
-        device: "R1",
-        path: "runningConfig.interfaces.Ethernet0/1.ospf.area",
-        expected: "0",
-        message: "R1: Ethernet0/1 が OSPF プロセス 33 の エリア 0 に参加していません (ip ospf 33 area 0)"
-      },
-      {
-        device: "R1",
-        path: "runningConfig.interfaces.Ethernet0/1.ospf.priority",
-        expected: 255,
-        message: "R1: Ethernet0/1 の OSPF priority が 255 に設定されていません"
-      },
+      { device: "Sw2", path: "runningConfig.interfaces.Ethernet0/3.switchport.voice_vlan", expected: "177", message: "Sw2: E0/3 に Voice VLAN 177 が設定されていません" },
 
-      // --- タスク2: Clear OSPF Process Log ---
-      {
-        device: "R1",
-        path: "runningConfig.logs",
-        condition: (logs) => logs && logs.some(l => l.command === 'clear' && l.target === 'ip ospf process' || l.raw === 'clear ip ospf process'),
-        message: "R1: DR選出のために OSPFプロセスがクリアされていません (clear ip ospf process)"
-      }
+      { device: "Sw1", path: "runningConfig.lldp.enabled", expected: true, message: "Sw1: LLDPがグローバルで有効になっていません (lldp run)" },
+      { device: "Sw1", path: "runningConfig.lldp.interfaces.Ethernet0/0.transmit", expected: true, message: "Sw1: E0/0 で lldp transmit が設定されていません" },
+      { device: "Sw1", path: "runningConfig.lldp.interfaces.Ethernet0/0.receive", expected: true, message: "Sw1: E0/0 で lldp receive が設定されていません" },
+      
+      { device: "Sw2", path: "runningConfig.lldp.enabled", expected: true, message: "Sw2: LLDPがグローバルで有効になっていません (lldp run)" },
+      { device: "Sw2", path: "runningConfig.lldp.interfaces.Ethernet0/0.transmit", expected: true, message: "Sw2: E0/0 で lldp transmit が設定されていません" },
+      
+      // ★ 設定保存チェック
+      { device: "Sw1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "Sw1: 設定が保存されていません (copy run start または write を実行してください)" },
+      { device: "Sw2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "Sw2: 設定が保存されていません (copy run start または write を実行してください)" }
+    ]
+  },
+
+  // -------------------------------------------------------------
+  // 【新】問題7: エンドデバイスへの接続とネイバーディスカバリ
+  // -------------------------------------------------------------
+  {
+    id: "new_q7",
+    title: "【新】問題⑦",
+    image: "img/new_q7.png",
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>R1には必要なコマンドがすべて事前に設定されています。すべての物理ケーブルは設置され、検証済みです。エンドデバイスへの接続を設定する必要があります。</p>
+      </div>
+    `,
+    tasks: [
+      "1. SW-1のスイッチポートE0/1をCisco IP電話とPCのトラフィックを伝送するように設定します。",
+      "2. SW-2のE0/1をPC2のトラフィックを伝送するように設定します。",
+      "3. SW-1でVLAN 10を「Engineering」という名前で設定します。",
+      "4. SW-1とSW-2間のリンクを、ベンダーニュートラルなネイバーディスカバリプロトコルを使用するように設定します。",
+      "5. SW-1からR1へのリンクを、Ciscoネイバーディスカバリプロトコルが通過しないように設定します。"
+    ],
+    // ▼ 練習モード用の解答を追加 ▼
+    answers: [
+`SW-1(config)#int e0/1
+SW-1(config-if)#switchport mode access
+SW-1(config-if)#switchport access vlan 10
+SW-1(config-if)#switchport voice vlan 11`,
+
+`SW-2(config)#int e0/1
+SW-2(config-if)#switchport mode access
+SW-2(config-if)#switchport access vlan 30`,
+
+`SW-1(config)#vlan 10
+SW-1(config-vlan)#name Engineering
+SW-1(config-vlan)#exit`,
+
+`SW-1、SW-2(config)#lldp run
+SW-1、SW-2(config)#int e0/0
+SW-1、SW-2(config-if)#lldp transmit
+SW-1、SW-2(config-if)#lldp receive`,
+
+`SW-1(config)#int e0/2
+SW-1(config-if)#no cdp enable`
+    ],
+    devices: [
+      { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
+      { name: "SW-2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+    ],
+    validations: [
+      // SW-1
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "access", message: "SW-1: E0/1 が access モードではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.switchport.access_vlan", expected: "10", message: "SW-1: E0/1 の access vlan が 10 に設定されていません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.switchport.voice_vlan", expected: "11", message: "SW-1: E0/1 の voice vlan が 11 に設定されていません" },
+      { device: "SW-1", path: "runningConfig.vlans.10.name", expected: "Engineering", message: "SW-1: VLAN 10 の名前が Engineering ではありません" },
+      { device: "SW-1", path: "runningConfig.lldp.enabled", expected: true, message: "SW-1: LLDPがグローバルで有効になっていません" },
+      { device: "SW-1", path: "runningConfig.lldp.interfaces.Ethernet0/0.transmit", expected: true, message: "SW-1: E0/0 で lldp transmit が設定されていません" },
+      { device: "SW-1", path: "runningConfig.lldp.interfaces.Ethernet0/0.receive", expected: true, message: "SW-1: E0/0 で lldp receive が設定されていません" },
+      { device: "SW-1", path: "runningConfig.cdp.interfaces.Ethernet0/2", expected: false, message: "SW-1: E0/2 で CDP が無効化されていません" },
+      // SW-2
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "access", message: "SW-2: E0/1 が access モードではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.switchport.access_vlan", expected: "30", message: "SW-2: E0/1 の access vlan が 30 に設定されていません" },
+      { device: "SW-2", path: "runningConfig.lldp.enabled", expected: true, message: "SW-2: LLDPがグローバルで有効になっていません" },
+      { device: "SW-2", path: "runningConfig.lldp.interfaces.Ethernet0/0.transmit", expected: true, message: "SW-2: E0/0 で lldp transmit が設定されていません" },
+      { device: "SW-2", path: "runningConfig.lldp.interfaces.Ethernet0/0.receive", expected: true, message: "SW-2: E0/0 で lldp receive が設定されていません" },
+      { device: "SW-1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-1: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "SW-2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-2: 設定が保存されていません (copy run start を実行してください)" }
+    ]
+  },
+
+  // -------------------------------------------------------------
+  // 【新】問題⑧: VLAN、トランク、およびリンクアグリゲーション
+  // -------------------------------------------------------------
+  {
+    id: "new_q8",
+    title: "【新】問題⑧",
+    image: "img/new_q8.png",
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>3台のスイッチすべてにVLAN35と45が設定されています。すべての物理接続がインストールおよび検証済みです。すべてのスイッチ間リンクが動作している必要があります。</p>
+      </div>
+    `,
+    tasks: [
+      "1. SW-1とSW2のスイッチポートe0/0とe0/1を802.1qトランキング用に設定し、すべてのVLANを許可する",
+      "2. SW-1 e0/2、SW-2 e0/2、SW-3 e0/0およびe0/1のスイッチ間リンクをネイティブVLAN35を使用するように設定します。",
+      "3. SW-1とSW-2のスイッチポートe0/0とe0/1をリンクアグリゲーション用に設定する。SW1はLACPを直ちにネゴシエートし、SW-2はLACP要求にのみ応答する必要がある。"
+    ],
+    // ▼ 練習モード用の解答と解説を追加 ▼
+    answers: [
+`SW-1、SW-2(config)# int range e0/0 - 1
+SW-1、SW-2(config-if-range)# switchport trunk encapsulation dot1q
+SW-1、SW-2(config-if-range)# switchport mode trunk`,
+
+`SW-1、SW-2 (config)# no logging console
+SW-1、SW-2 (config)# int e0/2
+SW-1、SW-2(config-if)# switchport trunk encapsulation dot1q
+SW-1、SW-2(config-if)# switchport mode trunk
+SW-1、SW-2(config-if)# switchport trunk native vlan 35
+
+SW-3 (config)# no logging console
+SW-3 (config)# int range e0/0 - 1
+SW-3 (config-if-range)# switchport trunk encapsulation dot1q
+SW-3 (config-if-range)# switchport mode trunk
+SW-3 (config-if-range)# switchport trunk native vlan 35
+
+【解説】
+no logging consoleコマンドはログの出力を停止するコマンドです。
+ネイティブVLANの設定変更を行うと、対向スイッチとのネイティブVLAN不一致でログ大量に出力されコマンドの実行がしにくくなるので無効化することでコマンドをスムーズに実行できるようになります。`,
+
+`SW-1(config)# int range e0/0 - 1
+SW-1(config-if-range)# channel-group 12 mode active
+
+SW-2(config)# int range e0/0 - 1
+SW-2(config-if-range)# channel-group 12 mode passive`
+    ],
+    devices: [
+      { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
+      { name: "SW-2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
+      { name: "SW-3", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+    ],
+    validations: [
+      // SW-1
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "SW-1: E0/0 の trunk encapsulation が dot1q ではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.switchport.mode", expected: "trunk", message: "SW-1: E0/0 が trunk モードではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.switchport.encapsulation", expected: "dot1q", message: "SW-1: E0/1 の trunk encapsulation が dot1q ではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "trunk", message: "SW-1: E0/1 が trunk モードではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/2.switchport.encapsulation", expected: "dot1q", message: "SW-1: E0/2 の trunk encapsulation が dot1q ではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "trunk", message: "SW-1: E0/2 が trunk モードではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/2.switchport.native_vlan", expected: "35", message: "SW-1: E0/2 の native vlan が 35 に設定されていません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.id", expected: "12", message: "SW-1: E0/0 に channel-group 12 が設定されていません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.mode", expected: "active", message: "SW-1: E0/0 の channel-group mode が active ではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.channelGroup.id", expected: "12", message: "SW-1: E0/1 に channel-group 12 が設定されていません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.channelGroup.mode", expected: "active", message: "SW-1: E0/1 の channel-group mode が active ではありません" },
+      // SW-2
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "SW-2: E0/0 の trunk encapsulation が dot1q ではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.switchport.mode", expected: "trunk", message: "SW-2: E0/0 が trunk モードではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.switchport.encapsulation", expected: "dot1q", message: "SW-2: E0/1 の trunk encapsulation が dot1q ではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "trunk", message: "SW-2: E0/1 が trunk モードではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.encapsulation", expected: "dot1q", message: "SW-2: E0/2 の trunk encapsulation が dot1q ではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "trunk", message: "SW-2: E0/2 が trunk モードではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.native_vlan", expected: "35", message: "SW-2: E0/2 の native vlan が 35 に設定されていません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.id", expected: "12", message: "SW-2: E0/0 に channel-group 12 が設定されていません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.mode", expected: "passive", message: "SW-2: E0/0 の channel-group mode が passive ではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.channelGroup.id", expected: "12", message: "SW-2: E0/1 に channel-group 12 が設定されていません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.channelGroup.mode", expected: "passive", message: "SW-2: E0/1 の channel-group mode が passive ではありません" },
+      // SW-3
+      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "SW-3: E0/0 の trunk encapsulation が dot1q ではありません" },
+      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/0.switchport.mode", expected: "trunk", message: "SW-3: E0/0 が trunk モードではありません" },
+      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/0.switchport.native_vlan", expected: "35", message: "SW-3: E0/0 の native vlan が 35 に設定されていません" },
+      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.encapsulation", expected: "dot1q", message: "SW-3: E0/1 の trunk encapsulation が dot1q ではありません" },
+      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "trunk", message: "SW-3: E0/1 が trunk モードではありません" },
+      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.native_vlan", expected: "35", message: "SW-3: E0/1 の native vlan が 35 に設定されていません" },
+      { device: "SW-1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-1: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "SW-2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-2: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "SW-3", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-3: 設定が保存されていません (copy run start を実行してください)" }
+    ]
+  },
+
+// -------------------------------------------------------------
+  // 【新】問題⑨: OSPFプロセスの設定（インターフェースベース）
+  // -------------------------------------------------------------
+  {
+    id: "new_q9",
+    title: "【新】問題⑨",
+    image: "img/new_q9.png",
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>※設定できる機器はR1です。</p>
+      </div>
+    `,
+    tasks: [
+      "タスク1. プロセス ID とルータ ID のみを使用して R1 上の OSPF を設定します。<br>・プロセス ID として 30 を使用<br>・ルーター ID として E0/0のIP を使用",
+      "タスク2. R1がR2およびR3とネイバー関係を確立するように設定します。OSPFプロセスのネットワークステートメントは使用しないでください。<br>R1が常にエリア0のDRになるように設定してください。"
+    ],
+    // ▼ ここから練習モード用の解答・解説を追加 ▼
+    answers: [
+      "R1(config)#router ospf 30\nR1(config-router)#router-id 10.0.12.1\n\n【解説】\n※上記のe0/0のIPアドレスは構成図上に書いていないので、本来は show run コマンド等で確認して設定する必要がありますが、構成図内のIPアドレスが変わっていなければ確認せずに上記のIPを決め打ちしても大丈夫です。\n\nR1#show run\n＝＝＝＝＝＝省略＝＝＝＝＝＝\n!\nhostname R1\n!\n!\ninterface Ethernet0/0　←★この下の行のIPを入力する\n ip address 10.0.12.1 255.255.255.0\n\n＝＝＝＝＝＝省略＝＝＝＝＝＝\n\n※なお当シミュレータでは再現不可のため確認できませんのでご了承ください。",
+      
+      "R1(config)#int range e0/0 - 1\nR1(config-if-range)#ip ospf 30 area 0\nR1(config-if-range)#ip ospf priority 255\nR1(config-if-range)#end\nR1#clear ip ospf process\n\n【解説】\nip ospf priority 255を設定する理由は、対象のルータ（今回の場合はR1）をOSPFのDR（代表ルータ）に確実に選出させるためです。\nOSPFのDR/BDR選出プロセスでは、インターフェースのプライオリティ値（0〜255、デフォルトは1）が最も高いルータが優先的にDRとして選ばれます。そのため、設定できる最高値である「255」を明示的に割り当てることで、他のルータのルータIDの大小に関係なく、R1が常にDRになるようにしています。\n\nclear ip ospf process コマンドを実行する理由は代表ルータの選出を再度行うためです。\nこのコマンドは実行した際にyes/noを入力する必要があります。\n\nR1# clear ip ospf process\nReset ALL OSPF processes? [no]: yes　←このyesを入力してEnter\nOSPF processes reset"
+    ],
+    // ▲ ここまで追加 ▲
+    devices: [
+      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+    ],
+    validations: [
+      { device: "R1", path: "runningConfig.routing.ospf.30.routerId", expected: "10.0.12.1", message: "R1: OSPFプロセス30のルーターIDが 10.0.12.1 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ospf.processId", expected: "30", message: "R1: E0/0 の OSPFプロセスIDが 30 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ospf.area", expected: "0", message: "R1: E0/0 の OSPFエリアが 0 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ospf.priority", expected: 255, message: "R1: E0/0 の OSPF priority が 255 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/1.ospf.processId", expected: "30", message: "R1: E0/1 の OSPFプロセスIDが 30 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/1.ospf.area", expected: "0", message: "R1: E0/1 の OSPFエリアが 0 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/1.ospf.priority", expected: 255, message: "R1: E0/1 の OSPF priority が 255 に設定されていません" },
+      { device: "R1", path: "runningConfig.logs", condition: (logs) => logs && logs.some(l => l.command === 'clear' && l.target === 'ip ospf process'), message: "R1: OSPFプロセスのクリアが実行されていません" },
+      { device: "R1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R1: 設定が保存されていません (copy run start を実行してください)" }
     ]
   }
-];
+
+  
+]; // ← シナリオ配列の閉じカッコ
