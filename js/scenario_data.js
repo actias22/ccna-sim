@@ -587,7 +587,7 @@ SW-2(config-if-range)# channel-group 12 mode passive`
   {
     id: "new_q10",
     title: "【新】問題⑩",
-    image: "img/スクリーンショット 2026-08-30 104054.png", // 必要に応じてファイル名/パスを調整してください
+    image: "img/new_q10.png", // 必要に応じてファイル名/パスを調整してください
     description: `
       <div class="task-section">
         <p><strong>ガイドライン</strong></p>
