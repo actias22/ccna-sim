@@ -634,7 +634,7 @@ SW-2(config-if-range)# channel-group 12 mode passive`
       { device: "HQ", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "HQ: 設定が保存されていません (copy run start を実行してください)" },
       { device: "Branch", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "Branch: 設定が保存されていません (copy run start を実行してください)" }
     ]
-  }
+  },
 
 
   
