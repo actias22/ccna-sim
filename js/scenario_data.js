@@ -636,5 +636,79 @@ SW-2(config-if-range)# channel-group 12 mode passive`
     ]
   }
 
+
+  
+// -------------------------------------------------------------
+  // 【新】問題⑪: 浮動スタティックルート（バックアプホストルート）
+  // -------------------------------------------------------------
+  {
+    id: "new_q11",
+    title: "【新】問題⑪",
+    image: "img/new_q11.png",
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>SJC、SQL、およびOAKルータに対して、デフォルトルートおよびAD値を考慮したプライマリ/バックアップのホストルートを設定し、設定を保存してください。</p>
+      </div>
+    `,
+    tasks: [
+      "1. SJCからISPを経由するデフォルトルートを設定する",
+      "2. SQLからPCへのホストルート(プライマリ/浮動バックアップ)を設定する",
+      "3. OAKからWebサーバへのホストルート(プライマリ/浮動バックアップ)を設定する"
+    ],
+    answers: [
+`SJC(config)#ip route 0.0.0.0 0.0.0.0 209.165.201.2`,
+
+`SQL(config)#ip route 10.10.44.2 255.255.255.255 10.10.54.1
+SQL(config)#ip route 10.10.44.2 255.255.255.255 10.10.10.1 10`,
+
+`OAK(config)#ip route 209.165.202.129 255.255.255.255 10.10.54.2
+OAK(config)#ip route 209.165.202.129 255.255.255.255 10.10.10.2 10`
+    ],
+    devices: [
+      { name: "SJC", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
+      { name: "SQL", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
+      { name: "OAK", type: "router", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] }
+    ],
+    validations: [
+      // SJCの判定
+      { 
+        device: "SJC", 
+        path: "runningConfig", 
+        condition: (config) => config?.routing?.staticRoutes?.some(r => r.destination === '0.0.0.0' && r.mask === '0.0.0.0' && r.nextHop === '209.165.201.2'), 
+        message: "SJC: ISPへのデフォルトルート（209.165.201.2）が正しく設定されていません" 
+      },
+      // SQLの判定
+      { 
+        device: "SQL", 
+        path: "runningConfig", 
+        condition: (config) => config?.routing?.staticRoutes?.some(r => r.destination === '10.10.44.2' && r.mask === '255.255.255.255' && r.nextHop === '10.10.54.1' && (r.distance === 1 || r.distance === undefined)), 
+        message: "SQL: PCへのプライマリホストルート（10.10.54.1）が正しく設定されていません" 
+      },
+      { 
+        device: "SQL", 
+        path: "runningConfig", 
+        condition: (config) => config?.routing?.staticRoutes?.some(r => r.destination === '10.10.44.2' && r.mask === '255.255.255.255' && r.nextHop === '10.10.10.1' && r.distance === 10), 
+        message: "SQL: PCへの浮動バックアップホストルート（10.10.10.1、AD: 10）が正しく設定されていません" 
+      },
+      // OAKの判定
+      { 
+        device: "OAK", 
+        path: "runningConfig", 
+        condition: (config) => config?.routing?.staticRoutes?.some(r => r.destination === '209.165.202.129' && r.mask === '255.255.255.255' && r.nextHop === '10.10.54.2' && (r.distance === 1 || r.distance === undefined)), 
+        message: "OAK: Webサーバへのプライマリホストルート（10.10.54.2）が正しく設定されていません" 
+      },
+      { 
+        device: "OAK", 
+        path: "runningConfig", 
+        condition: (config) => config?.routing?.staticRoutes?.some(r => r.destination === '209.165.202.129' && r.mask === '255.255.255.255' && r.nextHop === '10.10.10.2' && r.distance === 10), 
+        message: "OAK: Webサーバへの浮動バックアップホストルート（10.10.10.2、AD: 10）が正しく設定されていません" 
+      },
+      // 保存の判定
+      { device: "SJC", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SJC: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "SQL", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SQL: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "OAK", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "OAK: 設定が保存されていません (copy run start を実行してください)" }
+    ]
+  }
   
 ]; // ← シナリオ配列の閉じカッコ
