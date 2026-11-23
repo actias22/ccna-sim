@@ -193,11 +193,11 @@ OSPF processes reset`
   },
 
   // -------------------------------------------------------------
-  // 【新】問題④: IPv4 & IPv6 アドレス設定
+  // 【新】問題④-1: IPv4 & IPv6 アドレス設定
   // -------------------------------------------------------------
   {
     id: "new_q4",
-    title: "【新】問題④",
+    title: "【新】問題④-1",
     image: "img/new_q4.png",
     description: `
       <div class="task-section">
@@ -209,7 +209,6 @@ OSPF processes reset`
       "R1に、ipv4 ネットワークで使用可能な最初のホスト IP アドレスを設定します。<br>R2に、IPv4 ネットワークで使用可能な最後のホスト IP アドレスを設定します。",
       "R1 にIPv6 ネットワークで使用可能な最初のホスト IP アドレスを設定します。<br>R2 にIPv6 ネットワークで使用可能な最後のホスト IP アドレスを設定します。"
     ],
-    // ▼ 練習モード用の解答と解説を追加 ▼
     answers: [
 `R1(config)#interface e0/0
 R1(config-if)#ip address 10.0.12.5 255.255.255.252
@@ -238,7 +237,7 @@ IPv6アドレスの全体は128ビットです。今回指定されているネ�
 2001:db8:12::0 （Anycast用アドレス等として予約済のため使用不可）
 2001:db8:12::1 （最初に使用可能なホストIP）
 2001:db8:12::2
-2001:db8:12::3 （最後に使用可能なホストIP　※IPv6にはブロードキャストアドレスがありません）
+2001:db8:12::3 （最後に使用可能なホストIP ※IPv6にはブロードキャストアドレスがありません）
 
 3.各機器にアドレスを割り当てる
 タスクの要件に合わせて、算出したアドレスをR1とR2にそれぞれ設定します。
@@ -253,8 +252,79 @@ R2（最後のホストIP）： 2001:db8:12::3/126`
       { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ip", expected: "10.0.12.5", message: "R1: IPv4アドレスが 10.0.12.5 に設定されていません" },
       { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.mask", expected: "255.255.255.252", message: "R1: IPv4サブネットマスクが 255.255.255.252 ではありません" },
       { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.ip", expected: "10.0.12.6", message: "R2: IPv4アドレスが 10.0.12.6 に設定されていません" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.mask", expected: "255.255.255.252", message: "R2: IPv4サブネットマスクが 255.255.255.252 ではありません" },
       { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ipv6", expected: "2001:db8:12::1/126", message: "R1: IPv6アドレスが 2001:db8:12::1/126 に設定されていません" },
       { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.ipv6", expected: "2001:db8:12::3/126", message: "R2: IPv6アドレスが 2001:db8:12::3/126 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.status", expected: "up", message: "R1: インターフェースが起動していません (no shut)" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.status", expected: "up", message: "R2: インターフェースが起動していません (no shut)" },
+      { device: "R1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R1: 設定が保存されていません (copy run start を実行してください)" },
+      { device: "R2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R2: 設定が保存されていません (copy run start を実行してください)" }
+    ]
+  },
+
+  // -------------------------------------------------------------
+  // 【新】問題④-2: IPv4 & IPv6 アドレス設定（別パターン）
+  // -------------------------------------------------------------
+  {
+    id: "new_q4_2",
+    title: "【新】問題④-2",
+    image: "img/new_q4-2.png",
+    description: `
+      <div class="task-section">
+        <p><strong>ガイドライン</strong></p>
+        <p>指定されたサブネットを使用して、R1およびR2のインターフェースに適切なIPアドレスを設定してください。</p>
+      </div>
+    `,
+    tasks: [
+      "R1に、ipv4 ネットワークで使用可能な最初のホスト IP アドレスを設定します。<br>R2に、IPv4 ネットワークで使用可能な最後のホスト IP アドレスを設定します。",
+      "R1 にIPv6 ネットワークで使用可能な最初のホスト IP アドレスを設定します。<br>R2 にIPv6 ネットワークで使用可能な最後のホスト IP アドレスを設定します。"
+    ],
+    answers: [
+`R1(config)#interface e0/0
+R1(config-if)#ip address 10.0.12.17 255.255.255.252
+R1(config-if)#no shut
+
+R2(config)#interface e0/0
+R2(config-if)#ip address 10.0.12.18 255.255.255.252
+R2(config-if)#no shut`,
+
+`R1(config)#interface e0/0
+R1(config-if)#ipv6 address 2001:db8:12::11/126
+
+R2(config)#interface e0/0
+R2(config-if)#ipv6 address 2001:db8:12::13/126
+
+【解説】IPv6アドレス（/126）の計算方法
+プレフィックス長 /126 のIPv6ネットワークから、割り当て可能な「最初」と「最後」のホストIPアドレスを算出する手順は下記となります。
+
+1. ホスト部のビット数を確認する
+IPv6アドレスの全体は128ビットです。今回指定されているネットワークのプレフィックス長は /126 のため、128から126を引いた残りのビット数がホスト部となります。
+128ビット - 126ビット = 2ビット
+
+2. サブネット内のアドレス範囲を割り出す
+ホスト部が2ビットの場合、作ることができるアドレスのパターンは 2の2乗 で合計 4個 となります。
+指定されたサブネット 2001:db8:12::10/126 における末尾の4パターンは以下の通りです。
+2001:db8:12::10 （Anycast用アドレス等として予約済のため使用不可）
+2001:db8:12::11 （最初に使用可能なホストIP）
+2001:db8:12::12
+2001:db8:12::13 （最後に使用可能なホストIP ※IPv6にはブロードキャストアドレスがありません）
+
+3. 各機器にアドレスを割り当てる
+タスクの要件に合わせて、算出したアドレスをR1とR2にそれぞれ設定します。
+R1（最初のホストIP）： 2001:db8:12::11/126
+R2（最後のホストIP）： 2001:db8:12::13/126`
+    ],
+    devices: [
+      { name: "R1", type: "router", physicalPorts: ["Ethernet0/0"] },
+      { name: "R2", type: "router", physicalPorts: ["Ethernet0/0"] }
+    ],
+    validations: [
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ip", expected: "10.0.12.17", message: "R1: IPv4アドレスが 10.0.12.17 に設定されていません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.mask", expected: "255.255.255.252", message: "R1: IPv4サブネットマスクが 255.255.255.252 ではありません" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.ip", expected: "10.0.12.18", message: "R2: IPv4アドレスが 10.0.12.18 に設定されていません" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.mask", expected: "255.255.255.252", message: "R2: IPv4サブネットマスクが 255.255.255.252 ではありません" },
+      { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.ipv6", expected: "2001:db8:12::11/126", message: "R1: IPv6アドレスが 2001:db8:12::11/126 に設定されていません" },
+      { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.ipv6", expected: "2001:db8:12::13/126", message: "R2: IPv6アドレスが 2001:db8:12::13/126 に設定されていません" },
       { device: "R1", path: "runningConfig.interfaces.Ethernet0/0.status", expected: "up", message: "R1: インターフェースが起動していません (no shut)" },
       { device: "R2", path: "runningConfig.interfaces.Ethernet0/0.status", expected: "up", message: "R2: インターフェースが起動していません (no shut)" },
       { device: "R1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "R1: 設定が保存されていません (copy run start を実行してください)" },
