@@ -462,31 +462,25 @@ SW-1(config-if)#no cdp enable`
     description: `
       <div class="task-section">
         <p><strong>ガイドライン</strong></p>
-        <p>3台のスイッチすべてにVLAN35と45が設定されています。すべての物理接続がインストールおよび検証済みです。すべてのスイッチ間リンクが動作している必要があります。</p>
+        <p>2台のスイッチすべてにVLAN35と45が設定されています。すべての物理接続がインストールおよび検証済みです。すべてのスイッチ間リンクが動作している必要があります。</p>
       </div>
     `,
     tasks: [
-      "1. SW-1とSW2のスイッチポートe0/0とe0/1を802.1qトランキング用に設定し、すべてのVLANを許可する",
-      "2. SW-1 e0/2、SW-2 e0/2、SW-3 e0/0およびe0/1のスイッチ間リンクをネイティブVLAN35を使用するように設定します。",
-      "3. SW-1とSW-2のスイッチポートe0/0とe0/1をリンクアグリゲーション用に設定する。SW1はLACPを直ちにネゴシエートし、SW-2はLACP要求にのみ応答する必要がある。"
+      "1. SW-1とSW-2のスイッチポートe0/0とe0/1を802.1qトランキング用に設定し、すべてのVLANを許可する",
+      "2. SW-1とSW-2のe0/0およびe0/1のスイッチ間リンクをネイティブVLAN35を使用するように設定します。",
+      "3. SW-1とSW-2のスイッチポートe0/0とe0/1をリンクアグリゲーション用に設定する。SW-1はLACPを直ちにネゴシエートし、SW-2はLACP要求にのみ応答する必要がある。"
     ],
-    // ▼ 練習モード用の解答と解説を追加 ▼
+    // ▼ 練習モード用の解答と解説 ▼
     answers: [
 `SW-1、SW-2(config)# int range e0/0 - 1
 SW-1、SW-2(config-if-range)# switchport trunk encapsulation dot1q
 SW-1、SW-2(config-if-range)# switchport mode trunk`,
 
 `SW-1、SW-2 (config)# no logging console
-SW-1、SW-2 (config)# int e0/2
-SW-1、SW-2(config-if)# switchport trunk encapsulation dot1q
-SW-1、SW-2(config-if)# switchport mode trunk
-SW-1、SW-2(config-if)# switchport trunk native vlan 35
-
-SW-3 (config)# no logging console
-SW-3 (config)# int range e0/0 - 1
-SW-3 (config-if-range)# switchport trunk encapsulation dot1q
-SW-3 (config-if-range)# switchport mode trunk
-SW-3 (config-if-range)# switchport trunk native vlan 35
+SW-1、SW-2 (config)# int range e0/0 - 1
+SW-1、SW-2(config-if-range)# switchport trunk encapsulation dot1q
+SW-1、SW-2(config-if-range)# switchport mode trunk
+SW-1、SW-2(config-if-range)# switchport trunk native vlan 35
 
 【解説】
 no logging consoleコマンドはログの出力を停止するコマンドです。
@@ -499,19 +493,17 @@ SW-2(config)# int range e0/0 - 1
 SW-2(config-if-range)# channel-group 12 mode passive`
     ],
     devices: [
-      { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
-      { name: "SW-2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1", "Ethernet0/2"] },
-      { name: "SW-3", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
+      { name: "SW-1", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] },
+      { name: "SW-2", type: "switch", physicalPorts: ["Ethernet0/0", "Ethernet0/1"] }
     ],
     validations: [
       // SW-1
       { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "SW-1: E0/0 の trunk encapsulation が dot1q ではありません" },
       { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.switchport.mode", expected: "trunk", message: "SW-1: E0/0 が trunk モードではありません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.switchport.native_vlan", expected: "35", message: "SW-1: E0/0 の native vlan が 35 に設定されていません" },
       { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.switchport.encapsulation", expected: "dot1q", message: "SW-1: E0/1 の trunk encapsulation が dot1q ではありません" },
       { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "trunk", message: "SW-1: E0/1 が trunk モードではありません" },
-      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/2.switchport.encapsulation", expected: "dot1q", message: "SW-1: E0/2 の trunk encapsulation が dot1q ではありません" },
-      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "trunk", message: "SW-1: E0/2 が trunk モードではありません" },
-      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/2.switchport.native_vlan", expected: "35", message: "SW-1: E0/2 の native vlan が 35 に設定されていません" },
+      { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.switchport.native_vlan", expected: "35", message: "SW-1: E0/1 の native vlan が 35 に設定されていません" },
       { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.id", expected: "12", message: "SW-1: E0/0 に channel-group 12 が設定されていません" },
       { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.mode", expected: "active", message: "SW-1: E0/0 の channel-group mode が active ではありません" },
       { device: "SW-1", path: "runningConfig.interfaces.Ethernet0/1.channelGroup.id", expected: "12", message: "SW-1: E0/1 に channel-group 12 が設定されていません" },
@@ -519,25 +511,17 @@ SW-2(config-if-range)# channel-group 12 mode passive`
       // SW-2
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "SW-2: E0/0 の trunk encapsulation が dot1q ではありません" },
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.switchport.mode", expected: "trunk", message: "SW-2: E0/0 が trunk モードではありません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.switchport.native_vlan", expected: "35", message: "SW-2: E0/0 の native vlan が 35 に設定されていません" },
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.switchport.encapsulation", expected: "dot1q", message: "SW-2: E0/1 の trunk encapsulation が dot1q ではありません" },
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "trunk", message: "SW-2: E0/1 が trunk モードではありません" },
-      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.encapsulation", expected: "dot1q", message: "SW-2: E0/2 の trunk encapsulation が dot1q ではありません" },
-      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.mode", expected: "trunk", message: "SW-2: E0/2 が trunk モードではありません" },
-      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/2.switchport.native_vlan", expected: "35", message: "SW-2: E0/2 の native vlan が 35 に設定されていません" },
+      { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.switchport.native_vlan", expected: "35", message: "SW-2: E0/1 の native vlan が 35 に設定されていません" },
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.id", expected: "12", message: "SW-2: E0/0 に channel-group 12 が設定されていません" },
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/0.channelGroup.mode", expected: "passive", message: "SW-2: E0/0 の channel-group mode が passive ではありません" },
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.channelGroup.id", expected: "12", message: "SW-2: E0/1 に channel-group 12 が設定されていません" },
       { device: "SW-2", path: "runningConfig.interfaces.Ethernet0/1.channelGroup.mode", expected: "passive", message: "SW-2: E0/1 の channel-group mode が passive ではありません" },
-      // SW-3
-      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/0.switchport.encapsulation", expected: "dot1q", message: "SW-3: E0/0 の trunk encapsulation が dot1q ではありません" },
-      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/0.switchport.mode", expected: "trunk", message: "SW-3: E0/0 が trunk モードではありません" },
-      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/0.switchport.native_vlan", expected: "35", message: "SW-3: E0/0 の native vlan が 35 に設定されていません" },
-      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.encapsulation", expected: "dot1q", message: "SW-3: E0/1 の trunk encapsulation が dot1q ではありません" },
-      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.mode", expected: "trunk", message: "SW-3: E0/1 が trunk モードではありません" },
-      { device: "SW-3", path: "runningConfig.interfaces.Ethernet0/1.switchport.native_vlan", expected: "35", message: "SW-3: E0/1 の native vlan が 35 に設定されていません" },
+      // 保存チェック
       { device: "SW-1", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-1: 設定が保存されていません (copy run start を実行してください)" },
-      { device: "SW-2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-2: 設定が保存されていません (copy run start を実行してください)" },
-      { device: "SW-3", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-3: 設定が保存されていません (copy run start を実行してください)" }
+      { device: "SW-2", path: "runningConfig.startupConfig", condition: (val) => val != null, message: "SW-2: 設定が保存されていません (copy run start を実行してください)" }
     ]
   },
 
