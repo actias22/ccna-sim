@@ -43,11 +43,13 @@ SW-2(config-vlan)#exit`,
 
 `SW-1(config)#int e0/2
 SW-1(config-if)#switchport mode access
-SW-1(config-if)#switchport access vlan 35`,
+SW-1(config-if)#switchport access vlan 35
+SW-1(config-if)exit`,
 
 `SW-2(config)#int e0/2
 SW-2(config-if)#switchport mode access
-SW-2(config-if)#switchport access vlan 39`,
+SW-2(config-if)#switchport access vlan 39
+SW-2(config-if)exit`,
 
 `! SW-1とSW-2の両方でLLDPをグローバルに有効化する
 SW-1、SW-2(config)#lldp run
@@ -159,7 +161,8 @@ SW-1(config-if-range)#no cdp enable`
 R2(config-router)#router-id 10.2.2.2
 R2(config-router)#network 10.2.2.2 0.0.0.0 area 0
 R2(config-router)#network 10.0.12.0 0.0.0.3 area 0
-R2(config-router)#network 10.0.23.0 0.0.0.15 area 0`,
+R2(config-router)#network 10.0.23.0 0.0.0.15 area 0
+R2(config-router)#exit`,
 
 `R2(config)#interface range e0/0 - 1
 R2(config-if-range)#ip ospf priority 255
@@ -218,10 +221,10 @@ R2(config)#interface e0/0
 R2(config-if)#ip address 10.0.12.6 255.255.255.252
 R2(config-if)#no shut`,
 
-`R1(config)#interface e0/0
+`R1(config)#interface e0/0 ※タスク１でインターフェースに入っている場合は不要です。
 R1(config-if)#ipv6 address 2001:db8:12::1/126
 
-R2(config)#interface e0/0
+R2(config)#interface e0/0　※タスク１でインターフェースに入っている場合は不要です。
 R2(config-if)#ipv6 address 2001:db8:12::3/126
 
 【解説】IPv6アドレス（/126）の計算方法
@@ -288,10 +291,10 @@ R2(config)#interface e0/0
 R2(config-if)#ip address 10.0.12.18 255.255.255.252
 R2(config-if)#no shut`,
 
-`R1(config)#interface e0/0
+`R1(config)#interface e0/0　※タスク１でインターフェースに入っている場合は不要です。
 R1(config-if)#ipv6 address 2001:db8:12::11/126
 
-R2(config)#interface e0/0
+R2(config)#interface e0/0　※タスク１でインターフェースに入っている場合は不要です。
 R2(config-if)#ipv6 address 2001:db8:12::13/126
 
 【解説】IPv6アドレス（/126）の計算方法
@@ -362,7 +365,7 @@ Sw1(config-if)#switchport trunk encapsulation dot1q
 Sw1(config-if)#switchport mode trunk
 Sw1(config-if)#switchport trunk allowed vlan 12,22`,
 
-`Sw1,Sw2(config)#interface range e0/0 - 1
+`Sw1,Sw2(config)#interface range e0/0 - 1　※タスク１、２でインターフェースに入っている場合は不要です。
 Sw1,Sw2(config-if-range)#channel-group 12 mode active`
     ],
     devices: [
@@ -418,7 +421,8 @@ Sw1,Sw2(config-vlan)# exit`,
 `Sw1,Sw2(config)# int range e0/1 - 3
 Sw1,Sw2(config-if-range)# switchport mode access
 Sw1,Sw2(config-if-range)# switchport access vlan 77
-Sw1,Sw2(config-if-range)# switchport voice vlan 177`,
+Sw1,Sw2(config-if-range)# switchport voice vlan 177
+Sw1,Sw2(config-if-range)#exit`,
 
 `Sw1,Sw2(config)# lldp run
 Sw1,Sw2(config)# int e0/0
@@ -479,11 +483,13 @@ Sw1,Sw2(config-if)# lldp receive`
 `SW-1(config)#int e0/1
 SW-1(config-if)#switchport mode access
 SW-1(config-if)#switchport access vlan 10
-SW-1(config-if)#switchport voice vlan 11`,
+SW-1(config-if)#switchport voice vlan 11
+SW-1(config-if)#exit`,
 
 `SW-2(config)#int e0/1
 SW-2(config-if)#switchport mode access
-SW-2(config-if)#switchport access vlan 30`,
+SW-2(config-if)#switchport access vlan 30
+SW-2(config-if)#exit`,
 
 `SW-1(config)#vlan 10
 SW-1(config-vlan)#name Engineering
@@ -492,7 +498,8 @@ SW-1(config-vlan)#exit`,
 `SW-1、SW-2(config)#lldp run
 SW-1、SW-2(config)#int e0/0
 SW-1、SW-2(config-if)#lldp transmit
-SW-1、SW-2(config-if)#lldp receive`,
+SW-1、SW-2(config-if)#lldp receive
+SW-1、SW-2(config-if)#exit`,
 
 `SW-1(config)#int e0/2
 SW-1(config-if)#no cdp enable`
@@ -544,22 +551,21 @@ SW-1(config-if)#no cdp enable`
     answers: [
 `SW-1、SW-2(config)# int range e0/0 - 1
 SW-1、SW-2(config-if-range)# switchport trunk encapsulation dot1q
-SW-1、SW-2(config-if-range)# switchport mode trunk`,
+SW-1、SW-2(config-if-range)# switchport mode trunk
+SW-1、SW-2(config-if-range)# exit`,
 
 `SW-1、SW-2 (config)# no logging console
-SW-1、SW-2 (config)# int range e0/0 - 1
-SW-1、SW-2(config-if-range)# switchport trunk encapsulation dot1q
-SW-1、SW-2(config-if-range)# switchport mode trunk
+SW-1、SW-2 (config)# int range e0/0 - 1　
 SW-1、SW-2(config-if-range)# switchport trunk native vlan 35
 
 【解説】
 no logging consoleコマンドはログの出力を停止するコマンドです。
 ネイティブVLANの設定変更を行うと、対向スイッチとのネイティブVLAN不一致でログ大量に出力されコマンドの実行がしにくくなるので無効化することでコマンドをスムーズに実行できるようになります。`,
 
-`SW-1(config)# int range e0/0 - 1
+`SW-1(config)# int range e0/0 - 1　※他のタスクでインターフェースに入っている場合は不要
 SW-1(config-if-range)# channel-group 12 mode active
 
-SW-2(config)# int range e0/0 - 1
+SW-2(config)# int range e0/0 - 1　※他のタスクでインターフェースに入っている場合は不要
 SW-2(config-if-range)# channel-group 12 mode passive`
     ],
     devices: [
