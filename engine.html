@@ -456,7 +456,8 @@
                         candidates = ['access-group', 'address', 'authentication', 'dhcp', 'flow', 'hello-interval', 'helper-address', 'inspect', 'ips', 'mtu', 'nat', 'ospf', 'proxy-arp', 'split-horizon', 'summary-address', 'virtual-reassembly'];
                     }
                 }
-                else if (words.length === 2 && words[0].startsWith('conf')) {
+                // ▼ 修正: conft 等で補完候補が出ないように厳密化 ▼
+                else if (words.length === 2 && 'configure'.startsWith(words[0].toLowerCase()) && words[0].length >= 4) {
                     candidates = ['terminal'];
                 } 
                 else if (words.length === 2 && words[0] === 'copy') {
@@ -619,7 +620,13 @@
             }
 
             function processUserModeCommand(mainCommand, args, rawVal) {
-                if (mainCommand.startsWith('en')) { deviceState.mode = 'privileged'; updatePrompt(); return; }
+                // ▼ 修正: en / ena / enab / enabl / enable のみ許可（eneble 等のスペルミスを弾く） ▼
+                if ('enable'.startsWith(mainCommand) && mainCommand.length >= 2) {
+                    if (args.length > 1) { showInvalidMarker(rawVal, args, 1); return; }
+                    deviceState.mode = 'privileged';
+                    updatePrompt();
+                    return;
+                }
                 if (mainCommand === 'exit') {
                      if (deviceState.isSshSession) { window.parent.postMessage({ type: 'SSH_EXIT' }, '*'); return; }
                      appendToTerminal('Connection closed by foreign host.');
@@ -655,7 +662,20 @@
             }
 
             function processPrivilegedModeCommand(mainCommand, args, rawVal) {
-                if (mainCommand.startsWith('conf')) { deviceState.mode = 'config'; deviceState.configStack.push('privileged'); appendToTerminal('Enter configuration commands, one per line.  End with CNTL/Z.'); }
+                // ▼ 修正: conf〜configure とスペース区切りの t〜terminal を厳密にチェック ▼
+                if ('configure'.startsWith(mainCommand) && mainCommand.length >= 4) {
+                    if (args.length < 2) {
+                        appendToTerminal('% Incomplete command.');
+                    } else if (!'terminal'.startsWith(args[1].toLowerCase())) {
+                        showInvalidMarker(rawVal, args, 1);
+                    } else if (args.length > 2) {
+                        showInvalidMarker(rawVal, args, 2);
+                    } else {
+                        deviceState.mode = 'config';
+                        deviceState.configStack.push('privileged');
+                        appendToTerminal('Enter configuration commands, one per line.  End with CNTL/Z.');
+                    }
+                }
                 else if (mainCommand === 'exit') deviceState.mode = 'user';
                 else if (mainCommand === 'clear') {
                     if (args.length < 2) { appendToTerminal('% Incomplete command.'); }
