@@ -365,7 +365,7 @@ Sw1(config-if)#switchport trunk encapsulation dot1q
 Sw1(config-if)#switchport mode trunk
 Sw1(config-if)#switchport trunk allowed vlan 12,22`,
 
-`Sw1,Sw2(config)#interface range e0/0 - 1　※タスク１、２でインターフェースに入っている場合は不要です。
+`Sw1,Sw2(config)#interface range e0/0 - 1　※タスク１でインターフェースに入っている場合は不要です。
 Sw1,Sw2(config-if-range)#channel-group 12 mode active`
     ],
     devices: [
