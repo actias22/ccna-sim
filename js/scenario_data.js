@@ -340,7 +340,7 @@ R2（最後のホストIP）： 2001:db8:12::13/126`
   // -------------------------------------------------------------
   {
     id: "new_q5",
-    title: "【新】問題⑤",
+    title: "【新】問題⑤　※変更有",
     image: "img/new_q5.png",
     description: `
       <div class="task-section">
@@ -534,7 +534,7 @@ SW-1(config-if)#no cdp enable`
   // -------------------------------------------------------------
   {
     id: "new_q8",
-    title: "【新】問題⑧",
+    title: "【新】問題⑧　※変更有",
     image: "img/new_q8.png",
     description: `
       <div class="task-section">
