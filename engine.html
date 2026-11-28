@@ -566,8 +566,12 @@
                 candidates = candidates.filter(c => !c.startsWith('<') && c !== 'A.B.C.D');
 
                 if (candidates.length === 1) {
+                    // ▼ 修正: 実機同様に補完前の行を残して改行 ▼
+                    appendToTerminal(`${promptSpan.textContent}${currentInput}`);
+                    
                     words[words.length - 1] = candidates[0];
                     commandInput.value = words.join(' ') + ' ';
+                    commandInput.setSelectionRange(commandInput.value.length, commandInput.value.length);
                     syncInputDisplay();
                 } else if (candidates.length > 1) {
                     let commonPrefix = candidates[0];
@@ -580,8 +584,12 @@
                     }
                     const lastWord = words[words.length - 1] || '';
                     if (commonPrefix.length > lastWord.length) {
+                        // ▼ 修正: 部分補完が発生した場合も改行 ▼
+                        appendToTerminal(`${promptSpan.textContent}${currentInput}`);
+                        
                         words[words.length - 1] = commonPrefix;
                         commandInput.value = words.join(' ');
+                        commandInput.setSelectionRange(commandInput.value.length, commandInput.value.length);
                         syncInputDisplay();
                     }
                 }
